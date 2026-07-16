@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<title>Sales Performance — Real-Time</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<style>
+:root { color-scheme: light; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; background: #f0f2f5; color: #1a1a2e; }
+
+#loadingOverlay { position: fixed; inset: 0; background: rgba(12,12,12,0.92); display: flex; align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 16px; }
+.spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.2); border-top-color: #E9FF5F; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#loadingMsg { color: #e2e8f0; font-size: 13px; }
+
+.page-header { background: #0C0C0C; color: #fff; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+.page-header h1 { font-size: 17px; font-weight: 600; letter-spacing: .3px; }
+.page-header .subtitle { font-size: 12px; color: #9ba3af; margin-top: 2px; }
+.live-badge { background: #1a3a1a; border: 1px solid #2f6b2f; border-radius: 6px; padding: 5px 12px; font-size: 11px; color: #7ee787; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: #7ee787; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+.content { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+
+.cards-row { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+.stat-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 14px 18px; min-width: 170px; flex: 1; }
+.stat-card .sc-label { font-size: 10.5px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+.stat-card .sc-value { font-size: 22px; font-weight: 700; color: #0C0C0C; }
+.stat-card .sc-sub { font-size: 11px; color: #9ba3af; margin-top: 3px; }
+.stat-card.warn .sc-value { color: #b91c1c; }
+.stat-card.good .sc-value { color: #15803d; }
+
+.section-title { font-size: 14px; font-weight: 700; color: #0C0C0C; margin: 26px 0 10px; display: flex; align-items: center; gap: 8px; }
+.section-title .hint { font-weight: 400; font-size: 11px; color: #9ba3af; }
+
+.table-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; margin-bottom: 20px; }
+.chart-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 16px; margin-bottom: 20px; height: 260px; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 7px 10px; text-align: right; white-space: nowrap; font-size: 12.5px; }
+td.lbl { text-align: left; font-weight: 400; color: #374151; }
+td.lbl-indent { text-align: left; font-weight: 400; color: #374151; padding-left: 26px; }
+td.lbl-sub { text-align: left; font-weight: 700; color: #1a1a2e; }
+thead th { background: #f8fafc; color: #6b7280; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; border-bottom: 2px solid #e5e7eb; }
+thead th.th-lbl { text-align: left; }
+tbody tr.mgr-row { background: #f8fafc; border-top: 1px solid #e5e7eb; }
+tbody tr.mgr-row td { font-weight: 700; }
+tbody tr.ae-row td { border-top: 1px solid #f1f5f9; }
+tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
+.cov-good { color: #15803d; font-weight: 700; }
+.cov-warn { color: #b45309; font-weight: 700; }
+.cov-bad { color: #b91c1c; font-weight: 700; }
+.err-box { background: #fff; border-radius: 8px; border: 1px solid #fecaca; padding: 16px; color: #b91c1c; font-size: 12.5px; }
+
+/* Rep productivity table: tightened columns + sectioned group header so it fits
+   without horizontal scroll on a normal-width screen. */
+#repTable { table-layout: fixed; }
+#repTable th, #repTable td { padding: 5px 3px; font-size: 10.8px; white-space: normal; word-break: break-word; line-height: 1.25; }
+#repTable td.lbl-indent, #repTable td.lbl-sub { padding-left: 10px; }
+#repTable thead tr.grp-hdr th { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; padding: 5px 3px; border-bottom: 1px solid rgba(0,0,0,.06); text-align: center; }
+#repTable thead tr.grp-hdr th.grp-rep { background: #f8fafc; text-align: left; }
+#repTable thead tr.grp-hdr th.grp-1 { background: #eef2f7; color: #475569; }
+#repTable thead tr.grp-hdr th.grp-2 { background: #e7f5f7; color: #0e6a76; }
+#repTable thead tr.grp-hdr th.grp-3 { background: #fbfbe0; color: #7a6c00; }
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <div id="loadingMsg">Connecting to Snowflake…</div>
+</div>
+
+<div class="page-header">
+  <div>
+    <h1>Sales Performance — Real-Time</h1>
+    <div class="subtitle">Amperity &nbsp;·&nbsp; Open pipeline as of today, closed FYTD (Feb–Jun FY27)</div>
+  </div>
+  <div class="live-badge"><span class="live-dot"></span> Live · refreshes on load</div>
+</div>
+
+<div class="content" id="content">
+  <div id="cardsRow" class="cards-row"></div>
+
+  <div class="section-title">Pipeline coverage by quarter <span class="hint">Stage 1+ open pipe vs. AE quota, by close-quarter</span></div>
+  <div class="chart-card"><canvas id="coverageChart"></canvas></div>
+  <div class="table-card"><table id="coverageTable"></table></div>
+
+  <div class="section-title">Rep productivity <span class="hint">Open pipe by stage, closed FYTD, coverage vs. remaining quota</span></div>
+  <div class="table-card" style="overflow-x:auto"><table id="repTable"></table></div>
+</div>
+
+<script>
+// ─── CONSTANTS ────────────────────────────────────────
+const BRAND = { black:'#0C0C0C', lime:'#E9FF5F', teal:'#80C7D1', paleTeal:'#CAEFEF', coral:'#FF9988', good:'#15803d', warn:'#b45309', bad:'#b91c1c' };
+
+// Name mismatches between Salesforce pipeline (OWNER_NAME/RVP_NAME) and the
+// finance quota table (mrp_sales_targets.NAME) — kept in sync with the
+// monthly reporting dashboard's alias map.
+const NAME_ALIAS = {
+  'Christopher Hemmings': 'Chris Hemmings',
+  'Robert Pope': 'Rob Pope',
+  'Jeff Dome': 'Jeffrey Dome',
+  'David Newman': 'Dave Newman',
+};
+
+// Reps to drop from every view (e.g. no longer with the company / placeholder rows).
+const EXCLUDED_REPS = new Set(['Kevin Kovacevich']);
+
+// CLOSE_FISCAL_PERIOD values are labeled '2027 Qn' for FY27 (Feb 2026–Jan 2027) —
+// same offset-by-one convention Snowflake uses elsewhere in this workspace.
+const CURRENT_FY_PREFIX = '2027 ';
+function isCurrentFY(d){ return !!d.fq && d.fq.startsWith(CURRENT_FY_PREFIX); }
+
+const LATE_STAGES = new Set(['Stage 4 – Proposal & Plan', 'Stage 4 – Selection', 'Stage 5 – Negotiation']);
+
+// FY27 = Feb 2026 – Jan 2027. Closed-actuals months load through the last closed
+// month (June); the current open quarter is Q2 (May/Jun/Jul).
+const FYTD_MONTHS = ['2026-02-28','2026-03-31','2026-04-30','2026-05-31','2026-06-30'];
+const QUARTERS = [
+  { label: 'Q2 FY27 (current)', fq: '2027 Q2', months: ['2026-05-01','2026-06-01','2026-07-01'] },
+  { label: 'Q3 FY27',            fq: '2027 Q3', months: ['2026-08-01','2026-09-01','2026-10-01'] },
+  { label: 'Q4 FY27',            fq: '2027 Q4', months: ['2026-11-01','2026-12-01','2027-01-01'] },
+];
+const FULL_YEAR_MONTHS = ['2026-02-01','2026-03-01','2026-04-01','2026-05-01','2026-06-01','2026-07-01','2026-08-01','2026-09-01','2026-10-01','2026-11-01','2026-12-01','2027-01-01'];
+
+// ─── FORMATTERS ───────────────────────────────────────
+function N(v){ if(v==null||isNaN(v))return '—'; return Math.round(v).toLocaleString('en-US'); }
+function K(v){ if(v==null||isNaN(v))return '—'; const n=v/1000; return (n<0?'-$':'$')+Math.round(Math.abs(n)).toLocaleString('en-US')+'K'; }
+function PCT(v,d=0){ if(v==null||isNaN(v))return '—'; return (v*100).toFixed(d)+'%'; }
+function covClass(cov){ if(cov==null) return ''; if(cov>=3) return 'cov-good'; if(cov>=1.5) return 'cov-warn'; return 'cov-bad'; }
+function alias(n){ return NAME_ALIAS[n] || n; }
+
+// ─── SQL EXECUTION (same dual-mode pattern as the monthly dashboard) ──
+const USE_COWORK = () => !!window.cowork?.callMcpTool;
+const DASHBOARD_API_KEY = '81230abdf96a7de1dfe84165d28fea3c821b3318ad15d4be';
+
+async function execSQL(sql) {
+  if (!USE_COWORK()) {
+    const res = await fetch('/api/sql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Dashboard-Key': DASHBOARD_API_KEY },
+      body: JSON.stringify({ sql })
+    });
+    if (!res.ok) throw new Error('SQL error: ' + (await res.text()).slice(0, 200));
+    return res.json();
+  }
+  const raw = await window.cowork.callMcpTool('mcp__2c211ab0-a702-4355-9d71-4acf3f0ad8d5__sql_exec_tool', { sql });
+  let jsonStr;
+  if (typeof raw === 'string') jsonStr = raw;
+  else if (Array.isArray(raw)) { const b = raw.find(c=>c.type==='text'); jsonStr = b?b.text:JSON.stringify(raw); }
+  else if (raw?.content) { const b = Array.isArray(raw.content)?raw.content.find(c=>c.type==='text'):null; jsonStr = b?b.text:JSON.stringify(raw.content); }
+  else jsonStr = JSON.stringify(raw);
+  let p;
+  try { p = JSON.parse(jsonStr); }
+  catch(e) { throw new Error('SQL error: ' + jsonStr.slice(0, 200)); }
+  if (p.error || p.message?.startsWith?.('MCP')) throw new Error(p.error || p.message);
+  const rs = p.result_set || p;
+  const cols = rs.resultSetMetaData.rowType.map(c=>c.name);
+  return rs.data.map(row => { const o={}; cols.forEach((c,i)=>{ o[c]=row[i]; }); return o; });
+}
+
+// ─── QUERIES ──────────────────────────────────────────
+const Q = {
+  // All open, non-SQL-stage pipeline with per-deal detail — powers rep productivity,
+  // quarter coverage, and the late-stage deal list from a single round trip.
+  pipeline: `
+    SELECT OPPORTUNITY_NAME, ACCOUNT_NAME, OWNER_NAME, RVP_NAME, STAGE_NAME,
+           ARR, CLOSE_DT, CLOSE_FISCAL_PERIOD
+    FROM PROD.GTM.SALES_PIPELINE
+    WHERE STATE = 'Open'
+      AND TYPE IN ('Upsell','Full License')
+      AND STAGE_NAME IN (
+        'Stage 1 - Discovery','Stage 2 - Solution Identification','Stage 3 - Validation',
+        'Stage 4 – Proposal & Plan','Stage 4 – Selection','Stage 5 – Negotiation'
+      )
+    ORDER BY ARR DESC`,
+
+  closedFYTD: `
+    SELECT CLOSE_MONTH, OPPORTUNITY_OWNER, COALESCE(ACCOUNT_RVP,'') as ACCOUNT_RVP,
+           SUM(CLOSED_ARR) as CLOSED_ARR
+    FROM load.finance_sandbox.mrp_sales_effect
+    WHERE CLOSE_MONTH BETWEEN '2026-02-28' AND '2026-06-30'
+      AND REP_TYPE = 'AE'
+    GROUP BY CLOSE_MONTH, OPPORTUNITY_OWNER, ACCOUNT_RVP`,
+
+  salesTargets: `
+    SELECT ROLE_TYPE, NAME, MANAGER_NAME, MONTH_START, SUM(MONTHLY_QUOTA_FROM_PRORATED) as TARGET
+    FROM load.finance_sandbox.mrp_sales_targets
+    WHERE MONTH_START IN ('2026-02-01','2026-03-01','2026-04-01','2026-05-01','2026-06-01','2026-07-01','2026-08-01','2026-09-01','2026-10-01','2026-11-01','2026-12-01','2027-01-01')
+      AND ROLE_TYPE IN ('AE','RVP')
+      AND (IS_ACTIVE = TRUE OR IS_ACTIVE IS NULL)
+    GROUP BY ROLE_TYPE, NAME, MANAGER_NAME, MONTH_START`,
+};
+
+// ─── PRE-PROCESS ──────────────────────────────────────
+function parseDate(v){
+  if(!v && v!==0) return '';
+  const s=String(v);
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  const n=parseInt(s,10);
+  if(isNaN(n)) return s;
+  return new Date(n*86400000).toISOString().slice(0,10);
+}
+
+function preProcessPipeline(rows){
+  const deals = rows
+    .map(r => ({
+      name: r.OPPORTUNITY_NAME, account: r.ACCOUNT_NAME,
+      owner: alias(r.OWNER_NAME), rvp: alias(r.RVP_NAME || ''),
+      stage: r.STAGE_NAME, arr: +(r.ARR||0),
+      closeDt: parseDate(r.CLOSE_DT), fq: r.CLOSE_FISCAL_PERIOD || '',
+    }))
+    .filter(d => !EXCLUDED_REPS.has(d.owner));
+  return deals;
+}
+
+function preProcessClosed(rows){
+  const reps = {};
+  for (const r of rows) {
+    const rep = alias(r.OPPORTUNITY_OWNER);
+    if (EXCLUDED_REPS.has(rep)) continue;
+    const mgr = alias(r.ACCOUNT_RVP || '');
+    if (!reps[rep]) reps[rep] = { mgr, total: 0 };
+    reps[rep].total += +(r.CLOSED_ARR||0);
+    if (mgr) reps[rep].mgr = mgr;
+  }
+  return reps;
+}
+
+function preProcessTargets(rows){
+  const ae = {}, aeManager = {}, aeAnnual = {}, aeYtd = {}, aeQtr = {};
+  const YTD_MONTHS = new Set(['2026-02-01','2026-03-01','2026-04-01','2026-05-01','2026-06-01']);
+  for (const r of rows) {
+    if (r.ROLE_TYPE !== 'AE') continue;
+    const name = alias(r.NAME||''), val = +(r.TARGET||0), mgr = alias(r.MANAGER_NAME||'');
+    if (EXCLUDED_REPS.has(name)) continue;
+    const m = parseDate(r.MONTH_START);
+    if (mgr && !aeManager[name]) aeManager[name] = mgr;
+    aeAnnual[name] = (aeAnnual[name]||0) + val;
+    if (YTD_MONTHS.has(m)) aeYtd[name] = (aeYtd[name]||0) + val;
+    for (const q of QUARTERS) {
+      if (q.months.includes(m)) { if(!aeQtr[q.fq]) aeQtr[q.fq]={}; aeQtr[q.fq][name]=(aeQtr[q.fq][name]||0)+val; }
+    }
+  }
+  return { aeManager, aeAnnual, aeYtd, aeQtr, aeNames: Object.keys(aeAnnual) };
+}
+
+// ─── BUILD ────────────────────────────────────────────
+function buildCards(deals, closed, tgt){
+  const fyDeals = deals.filter(isCurrentFY);
+  const openPipeFY = fyDeals.reduce((s,d)=>s+d.arr,0);
+  const allTimePipe = deals.reduce((s,d)=>s+d.arr,0);
+  const closedFYTD = Object.values(closed).reduce((s,r)=>s+r.total,0);
+  const annualQuota = Object.values(tgt.aeAnnual).reduce((s,v)=>s+v,0);
+  const remaining = annualQuota - closedFYTD;
+  const coverage = remaining>0 ? openPipeFY/remaining : null;
+  const late = deals.filter(d=>LATE_STAGES.has(d.stage));
+  const lateVal = late.reduce((s,d)=>s+d.arr,0);
+
+  // reps below 3x coverage on their own remaining quota (FY-close pipe only)
+  const byRepFY = {};
+  for (const d of fyDeals) { byRepFY[d.owner] = (byRepFY[d.owner]||0) + d.arr; }
+  let below3x = 0, repsWithQuota = 0;
+  for (const name of tgt.aeNames) {
+    const rem = tgt.aeAnnual[name] - (closed[name]?.total||0);
+    if (rem <= 0) continue;
+    repsWithQuota++;
+    const cov = (byRepFY[name]||0) / rem;
+    if (cov < 3) below3x++;
+  }
+
+  const cards = [
+    { label:'Open pipe (closing this FY)', value:K(openPipeFY), sub:`${fyDeals.length} deals, Stage 1+ · ${K(allTimePipe)} all-time` },
+    { label:'Closed-won FYTD', value:K(closedFYTD), sub:'Feb–Jun FY27' },
+    { label:'Company coverage', value: coverage!=null?coverage.toFixed(1)+'x':'—', sub:'FY open pipe ÷ (quota − closed)', cls: coverage!=null?(coverage>=3?'good':coverage<1.5?'warn':''):'' },
+    { label:'Late-stage value', value:K(lateVal), sub:`${late.length} deals in Selection/Negotiation` },
+    { label:'Reps under 3x coverage', value: `${below3x} / ${repsWithQuota}`, sub:'of reps with remaining quota', cls: below3x>repsWithQuota/2?'warn':'' },
+  ];
+  document.getElementById('cardsRow').innerHTML = cards.map(c=>`
+    <div class="stat-card ${c.cls||''}">
+      <div class="sc-label">${c.label}</div>
+      <div class="sc-value">${c.value}</div>
+      <div class="sc-sub">${c.sub}</div>
+    </div>`).join('');
+}
+
+function buildCoverage(deals, tgt){
+  const rows = QUARTERS.map(q => {
+    const pipe = deals.filter(d=>d.fq===q.fq).reduce((s,d)=>s+d.arr,0);
+    const quota = Object.values(tgt.aeQtr[q.fq]||{}).reduce((s,v)=>s+v,0);
+    const cov = quota>0 ? pipe/quota : null;
+    return { label:q.label, pipe, quota, cov };
+  });
+
+  new Chart(document.getElementById('coverageChart'), {
+    type: 'bar',
+    data: {
+      labels: rows.map(r=>r.label),
+      datasets: [
+        { label:'Open pipe (Stage 1+)', data: rows.map(r=>Math.round(r.pipe/1000)), backgroundColor: BRAND.teal, borderRadius: 3 },
+        { label:'Quota', data: rows.map(r=>Math.round(r.quota/1000)), backgroundColor: BRAND.black, borderRadius: 3 },
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top', labels:{boxWidth:12}}}, scales:{ x:{grid:{display:false}}, y:{grid:{color:'#f1f5f9'}, ticks:{callback:v=>'$'+v+'K'}} } }
+  });
+
+  let h = `<thead><tr><th class="th-lbl">Quarter</th><th>Open Pipe (S1+)</th><th>Quota</th><th>Coverage</th></tr></thead><tbody>`;
+  for (const r of rows) {
+    h += `<tr>
+      <td class="lbl">${r.label}</td>
+      <td>${K(r.pipe)}</td>
+      <td>${r.quota>0?K(r.quota):'—'}</td>
+      <td class="${covClass(r.cov)}">${r.cov!=null?r.cov.toFixed(1)+'x':'—'}</td>
+    </tr>`;
+  }
+  h += `</tbody>`;
+  document.getElementById('coverageTable').innerHTML = h;
+}
+
+function buildRepTable(deals, closed, tgt){
+  const byRep = {};
+  for (const d of deals) {
+    if (!byRep[d.owner]) byRep[d.owner] = { rvp: d.rvp, stages:{}, total:0, fyTotal:0 };
+    // Stage breakdown is all-time (regardless of close date) — matches the
+    // "All-Time Pipe" column. "Open Pipe (this FY)" is a separate FY27-only total.
+    byRep[d.owner].stages[d.stage] = (byRep[d.owner].stages[d.stage]||0) + d.arr;
+    byRep[d.owner].total += d.arr;
+    if (isCurrentFY(d)) byRep[d.owner].fyTotal += d.arr;
+    if (d.rvp) byRep[d.owner].rvp = d.rvp;
+  }
+  // union of every rep we know about from pipeline, closed actuals, or quota
+  const allReps = new Set([...Object.keys(byRep), ...Object.keys(closed), ...tgt.aeNames]);
+  const mgrGroups = {};
+  for (const rep of allReps) {
+    const mgr = byRep[rep]?.rvp || closed[rep]?.mgr || tgt.aeManager[rep] || 'Unassigned';
+    if (!mgrGroups[mgr]) mgrGroups[mgr] = [];
+    mgrGroups[mgr].push(rep);
+  }
+  const sortedMgrs = Object.keys(mgrGroups).sort((a,b) => {
+    const totA = mgrGroups[a].reduce((s,r)=>s+(byRep[r]?.total||0),0);
+    const totB = mgrGroups[b].reduce((s,r)=>s+(byRep[r]?.total||0),0);
+    return totB - totA;
+  });
+
+  let h = `<colgroup>
+    <col style="width:15%">
+    <col style="width:7%"><col style="width:7%"><col style="width:6%">
+    <col style="width:5.5%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:5.5%">
+    <col style="width:8%"><col style="width:7%">
+    <col style="width:7%"><col style="width:7%"><col style="width:8%">
+  </colgroup>
+  <thead>
+  <tr class="grp-hdr">
+    <th class="th-lbl grp-rep" rowspan="2">Rep</th>
+    <th class="grp-1" colspan="3">YTD vs. quota</th>
+    <th class="grp-2" colspan="7">Open pipeline — this FY</th>
+    <th class="grp-3" colspan="3">Total pipeline — all dates</th>
+  </tr>
+  <tr>
+    <th>Closed FYTD</th><th>Quota YTD</th><th>% to Quota</th>
+    <th>S1</th><th>S2</th><th>S3</th><th>S4</th><th>S5</th>
+    <th>Open Pipe</th><th>FY Coverage</th>
+    <th>Total Pipe</th><th>Annual Quota</th><th>Annual Coverage</th>
+  </tr>
+  </thead><tbody>`;
+
+  let gT={s:[0,0,0,0,0],openFY:0,allTime:0,closed:0,annual:0,ytdq:0};
+  for (const mgr of sortedMgrs) {
+    const reps = mgrGroups[mgr].sort((a,b)=>(byRep[b]?.total||0)-(byRep[a]?.total||0));
+    const mS=[0,0,0,0,0]; let mOpenFY=0, mAllTime=0, mClosed=0, mAnnual=0, mYtdQ=0;
+    let repRows = '';
+    for (const rep of reps) {
+      const d = byRep[rep] || { stages:{}, fyStages:{}, total:0, fyTotal:0 };
+      const s1=d.stages['Stage 1 - Discovery']||0, s2=d.stages['Stage 2 - Solution Identification']||0,
+            s3=d.stages['Stage 3 - Validation']||0,
+            s4=(d.stages['Stage 4 – Proposal & Plan']||0)+(d.stages['Stage 4 – Selection']||0),
+            s5=d.stages['Stage 5 – Negotiation']||0;
+      const openFY=d.fyTotal, allTime=d.total, cl=closed[rep]?.total||0, annual=tgt.aeAnnual[rep]||0, ytdq=tgt.aeYtd[rep]||0;
+      const remaining = annual - cl;
+      const covFY = remaining>0 ? openFY/remaining : null;
+      const covAnnual = remaining>0 ? allTime/remaining : null;
+      const pctToQuota = ytdq>0 ? cl/ytdq : null;
+      mS[0]+=s1;mS[1]+=s2;mS[2]+=s3;mS[3]+=s4;mS[4]+=s5;
+      mOpenFY+=openFY; mAllTime+=allTime; mClosed+=cl; mAnnual+=annual; mYtdQ+=ytdq;
+      repRows += `<tr class="ae-row">
+        <td class="lbl-indent">${rep}</td>
+        <td>${K(cl)}</td><td>${ytdq?K(ytdq):'—'}</td><td>${pctToQuota!=null?PCT(pctToQuota):'—'}</td>
+        <td>${s1?K(s1):'—'}</td><td>${s2?K(s2):'—'}</td><td>${s3?K(s3):'—'}</td><td>${s4?K(s4):'—'}</td><td>${s5?K(s5):'—'}</td>
+        <td>${K(openFY)}</td><td class="${covClass(covFY)}">${covFY!=null?covFY.toFixed(1)+'x':'—'}</td>
+        <td>${K(allTime)}</td><td>${annual?K(annual):'—'}</td>
+        <td class="${covClass(covAnnual)}">${covAnnual!=null?covAnnual.toFixed(1)+'x':'—'}</td>
+      </tr>`;
+    }
+    const mRemaining = mAnnual - mClosed;
+    const mCovFY = mRemaining>0 ? mOpenFY/mRemaining : null;
+    const mCovAnnual = mRemaining>0 ? mAllTime/mRemaining : null;
+    const mPctToQuota = mYtdQ>0 ? mClosed/mYtdQ : null;
+    h += `<tr class="mgr-row">
+      <td class="lbl-sub">${mgr}</td>
+      <td>${K(mClosed)}</td><td>${mYtdQ?K(mYtdQ):'—'}</td><td>${mPctToQuota!=null?PCT(mPctToQuota):'—'}</td>
+      <td>${mS[0]?K(mS[0]):'—'}</td><td>${mS[1]?K(mS[1]):'—'}</td><td>${mS[2]?K(mS[2]):'—'}</td><td>${mS[3]?K(mS[3]):'—'}</td><td>${mS[4]?K(mS[4]):'—'}</td>
+      <td>${K(mOpenFY)}</td><td class="${covClass(mCovFY)}">${mCovFY!=null?mCovFY.toFixed(1)+'x':'—'}</td>
+      <td>${K(mAllTime)}</td><td>${mAnnual?K(mAnnual):'—'}</td>
+      <td class="${covClass(mCovAnnual)}">${mCovAnnual!=null?mCovAnnual.toFixed(1)+'x':'—'}</td>
+    </tr>`;
+    h += repRows;
+    gT.s[0]+=mS[0];gT.s[1]+=mS[1];gT.s[2]+=mS[2];gT.s[3]+=mS[3];gT.s[4]+=mS[4];
+    gT.openFY+=mOpenFY; gT.allTime+=mAllTime; gT.closed+=mClosed; gT.annual+=mAnnual; gT.ytdq+=mYtdQ;
+  }
+  const gRemaining = gT.annual - gT.closed;
+  const gCovFY = gRemaining>0 ? gT.openFY/gRemaining : null;
+  const gCovAnnual = gRemaining>0 ? gT.allTime/gRemaining : null;
+  const gPctToQuota = gT.ytdq>0 ? gT.closed/gT.ytdq : null;
+  h += `<tr class="total-row">
+    <td class="lbl-sub">Total</td>
+    <td>${K(gT.closed)}</td><td>${K(gT.ytdq)}</td><td>${gPctToQuota!=null?PCT(gPctToQuota):'—'}</td>
+    <td>${K(gT.s[0])}</td><td>${K(gT.s[1])}</td><td>${K(gT.s[2])}</td><td>${K(gT.s[3])}</td><td>${K(gT.s[4])}</td>
+    <td>${K(gT.openFY)}</td><td class="${covClass(gCovFY)}">${gCovFY!=null?gCovFY.toFixed(1)+'x':'—'}</td>
+    <td>${K(gT.allTime)}</td><td>${K(gT.annual)}</td>
+    <td class="${covClass(gCovAnnual)}">${gCovAnnual!=null?gCovAnnual.toFixed(1)+'x':'—'}</td>
+  </tr>`;
+  h += `</tbody>`;
+  document.getElementById('repTable').innerHTML = h;
+}
+
+// ─── MAIN ─────────────────────────────────────────────
+async function waitForCowork(timeout=5000) {
+  const start=Date.now();
+  while(!window.cowork?.callMcpTool) {
+    if(Date.now()-start>timeout) return;
+    await new Promise(r=>setTimeout(r,150));
+  }
+}
+
+async function loadAll() {
+  const msg = document.getElementById('loadingMsg');
+  try {
+    msg.textContent = 'Connecting to Snowflake…';
+    await waitForCowork();
+    msg.textContent = 'Fetching pipeline, closed deals, and quotas…';
+    const [pipeRows, closedRows, tgtRows] = await Promise.all([
+      execSQL(Q.pipeline), execSQL(Q.closedFYTD), execSQL(Q.salesTargets)
+    ]);
+    msg.textContent = 'Building dashboard…';
+    const deals = preProcessPipeline(pipeRows);
+    const closed = preProcessClosed(closedRows);
+    const tgt = preProcessTargets(tgtRows);
+
+    buildCards(deals, closed, tgt);
+    buildCoverage(deals, tgt);
+    buildRepTable(deals, closed, tgt);
+
+    document.getElementById('loadingOverlay').style.display = 'none';
+  } catch (e) {
+    document.getElementById('content').innerHTML =
+      `<div class="err-box"><strong>Data load failed:</strong> ${e.message}</div>`;
+    document.getElementById('loadingOverlay').style.display = 'none';
+    console.error(e);
+  }
+}
+loadAll();
+</script>
+</body>
+</html>

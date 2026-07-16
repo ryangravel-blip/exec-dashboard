@@ -1,0 +1,12 @@
+{
+  "buildCommand": "mkdir -p dist && cp index.html dist/index.html",
+  "outputDirectory": "dist",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive, nosnippet" }
+      ]
+    }
+  ]
+}
