@@ -177,7 +177,7 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
     <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-green"></span>Green</div><div class="cs-value" id="ch-green">—</div><div class="cs-sub">Pulse 4–5</div></div>
   </div>
 
-  <div class="section-title">Customer health <span class="hint">ARR base from Salesforce · Relationship Health Pulse (CSM) · 4-week AMPs usage vs. prior 4 weeks</span></div>
+  <div class="section-title">Customer health <span class="hint">ARR base from Salesforce · Relationship Health Pulse (CSM) · Last 7-day AMPs usage vs. trailing 4-week average</span></div>
   <div class="custarr-controls">
     <input type="text" id="chSearch" placeholder="Search customers…" oninput="filterHealthTable()">
     <label>Type: <select id="chTypeFilter" onchange="filterHealthTable()">
@@ -301,7 +301,7 @@ const Q = {
   // (PROD.DEALSBASE.CUSTOMER_ACCOUNT_MAP joined to PROD.SALESFORCE.ACCOUNTS),
   // plus: Relationship Health Pulse (CSM) from the raw Salesforce Account object
   // (not yet mirrored into the cleaned PROD.SALESFORCE.ACCOUNTS table), contract
-  // start date, and a 4-week vs. prior-4-week AMPs usage comparison from
+  // start date, and a last-7-day vs. trailing-4-week AMPs usage comparison from
   // PROD.FISHBOWL.AMPS.
   customerHealth: `
     WITH sf_customers AS (
@@ -333,16 +333,16 @@ const Q = {
     ),
     usage_agg AS (
       SELECT SALESFORCE_ACCOUNT_ID,
-        SUM(CASE WHEN USAGE_DATE >= DATEADD(day,-28,CURRENT_DATE()) THEN AMPS_AMOUNT ELSE 0 END) / 28.0 AS CURR_4WK_AVG,
-        SUM(CASE WHEN USAGE_DATE >= DATEADD(day,-56,CURRENT_DATE()) AND USAGE_DATE < DATEADD(day,-28,CURRENT_DATE()) THEN AMPS_AMOUNT ELSE 0 END) / 28.0 AS PRIOR_4WK_AVG
+        SUM(CASE WHEN USAGE_DATE >= DATEADD(day,-7,CURRENT_DATE()) THEN AMPS_AMOUNT ELSE 0 END) / 7.0 AS CURR_7D_AVG,
+        SUM(CASE WHEN USAGE_DATE >= DATEADD(day,-28,CURRENT_DATE()) THEN AMPS_AMOUNT ELSE 0 END) / 28.0 AS AVG_4WK_AVG
       FROM PROD.FISHBOWL.AMPS
-      WHERE USAGE_DATE >= DATEADD(day,-56,CURRENT_DATE()) AND TENANT_IS_SANDBOX = FALSE
+      WHERE USAGE_DATE >= DATEADD(day,-28,CURRENT_DATE()) AND TENANT_IS_SANDBOX = FALSE
       GROUP BY SALESFORCE_ACCOUNT_ID
     )
     SELECT
       c.CUSTOMER_NAME, c.ARR, c.CONTRACT_TYPE, c.CONTRACT_START_DT, c.CONTRACT_END_DT,
       COALESCE(v.VERTICAL, '') AS VERTICAL,
-      p.PULSE, u.CURR_4WK_AVG, u.PRIOR_4WK_AVG
+      p.PULSE, u.CURR_7D_AVG, u.AVG_4WK_AVG
     FROM sf_customers c
     LEFT JOIN sf_vertical v ON c.CUSTOMER_ID = v.CUSTOMER_ID
     LEFT JOIN pulse p ON c.ACCOUNT_ID = p.ACCOUNT_ID
@@ -407,8 +407,8 @@ function preProcessCustomerHealth(rows){
   return rows.map(r => {
     const pulseRaw = r.PULSE || '';
     const score = pulseRaw ? parseInt(pulseRaw, 10) : null;
-    const curr = r.CURR_4WK_AVG!=null ? +r.CURR_4WK_AVG : null;
-    const prior = r.PRIOR_4WK_AVG!=null ? +r.PRIOR_4WK_AVG : null;
+    const curr = r.CURR_7D_AVG!=null ? +r.CURR_7D_AVG : null;
+    const prior = r.AVG_4WK_AVG!=null ? +r.AVG_4WK_AVG : null;
     const variance = (curr!=null && prior) ? (curr-prior)/prior : null;
     return {
       name: r.CUSTOMER_NAME, arr: +(r.ARR||0), contractType: r.CONTRACT_TYPE,
@@ -671,7 +671,7 @@ function renderHealthTable(rows){
     return healthSortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
   });
 
-  const headers = ['Customer','ARR','Type','Contract Start','Contract End','Pulse (CSM)','4-Wk Avg Usage','vs. Prior 4-Wk','Vertical'];
+  const headers = ['Customer','ARR','Type','Contract Start','Contract End','Pulse (CSM)','Last 7-Day Avg Usage','vs. 4-Wk Avg','Vertical'];
   let thead = '<thead><tr>';
   headers.forEach((h,i) => {
     const cls = healthSortCol===i ? (healthSortAsc?'sort-asc':'sort-desc') : '';
