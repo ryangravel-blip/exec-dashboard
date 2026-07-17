@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
-<title>Sales Performance — Real-Time</title>
+<title>Amperity — Real-Time Dashboards</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
 <style>
 :root { color-scheme: light; }
@@ -35,6 +35,57 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 .section-title { font-size: 14px; font-weight: 700; color: #0C0C0C; margin: 26px 0 10px; display: flex; align-items: center; gap: 8px; }
 .section-title .hint { font-weight: 400; font-size: 11px; color: #9ba3af; }
+
+/* Tab nav */
+.tab-nav { display: flex; gap: 4px; }
+.tab-btn { background: transparent; border: none; color: #9ba3af; font-size: 12.5px; font-weight: 600; padding: 8px 14px; border-radius: 6px 6px 0 0; cursor: pointer; }
+.tab-btn:hover { color: #e2e8f0; }
+.tab-btn.active { background: #1a1a1a; color: #fff; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* Customer Health tab */
+.custarr-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+.custarr-controls input[type=text], .custarr-controls select {
+  font-size: 12px; padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+  background: #fff; color: #1a1a2e; outline: none;
+}
+.custarr-controls input[type=text] { min-width: 220px; }
+.custarr-controls input[type=text]:focus, .custarr-controls select:focus { border-color: #80C7D1; }
+.custarr-controls label { font-size: 11px; color: #6b7280; font-weight: 500; }
+.custarr-summary { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.custarr-stat { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 12px 18px; min-width: 130px; }
+.custarr-stat .cs-label { font-size: 10.5px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
+.custarr-stat .cs-value { font-size: 18px; font-weight: 700; color: #1a1a2e; }
+.custarr-stat .cs-sub { font-size: 10.5px; color: #9ba3af; margin-top: 2px; }
+.tag { display: inline-block; font-size: 10px; font-weight: 600; border-radius: 4px; padding: 2px 7px; white-space: nowrap; }
+.tag-sub { background: #CAEFEF; color: #155e75; }
+.tag-con { background: #fef3c7; color: #92400e; }
+.tag-unk { background: #f1f5f9; color: #6b7280; }
+.custarr-table { width: 100%; border-collapse: collapse; }
+.custarr-table th { position: sticky; top: 0; background: #f8fafc; color: #6b7280; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 8px 10px; border-bottom: 2px solid #e5e7eb; cursor: pointer; white-space: nowrap; user-select: none; }
+.custarr-table th:hover { background: #e8ecf0; }
+.custarr-table th.sort-asc::after { content: ' ▲'; color: #80C7D1; }
+.custarr-table th.sort-desc::after { content: ' ▼'; color: #80C7D1; }
+.custarr-table th:first-child { text-align: left; }
+.custarr-table td { padding: 6px 10px; font-size: 12px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
+.custarr-table td:first-child { text-align: left; color: #374151; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.custarr-table td:not(:first-child) { text-align: right; }
+.custarr-table td.td-center { text-align: center; }
+.custarr-table td.td-left { text-align: left; }
+.custarr-table tbody tr:hover td { background: #ebf4ff !important; }
+.custarr-table tbody tr:nth-child(even) td { background: #fcfcfc; }
+.custarr-count { font-size: 11px; color: #9ba3af; margin-top: 8px; }
+.contract-end-soon { color: #dc2626; font-weight: 600; }
+.contract-end-near  { color: #d97706; font-weight: 600; }
+.var-good  { color: #15803d; font-weight: 600; }
+.var-bad   { color: #dc2626; font-weight: 600; }
+.var-flat  { color: #6b7280; }
+.health-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; vertical-align: middle; flex: none; }
+.health-red { background: #dc2626; }
+.health-yellow { background: #d97706; }
+.health-green { background: #15803d; }
+.health-unk { background: #d1d5db; }
 
 .table-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; margin-bottom: 20px; }
 .chart-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 16px; margin-bottom: 20px; height: 260px; }
@@ -76,20 +127,26 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
 
 <div class="page-header">
   <div>
-    <h1>Sales Performance — Real-Time</h1>
-    <div class="subtitle">Amperity &nbsp;·&nbsp; Open pipeline as of today, closed FYTD (Feb–Jun FY27)</div>
+    <h1>Real-Time Dashboards</h1>
+    <div class="subtitle">Amperity &nbsp;·&nbsp; Live, queried on every page load</div>
+  </div>
+  <div class="tab-nav">
+    <button class="tab-btn active" id="tabBtn-sales" onclick="showTab('sales')">Sales Performance</button>
+    <button class="tab-btn" id="tabBtn-health" onclick="showTab('health')">Customer Health</button>
   </div>
   <div class="live-badge"><span class="live-dot"></span> Live · refreshes on load</div>
 </div>
 
 <div class="content" id="content">
+
+<div class="tab-pane active" id="tab-sales">
   <div id="cardsRow" class="cards-row"></div>
 
   <div class="section-title">Weekly pipeline changes <span class="hint">Auto-generated Friday mornings, week over week</span></div>
   <div class="table-card" id="weeklySummaryCard" style="padding:16px 18px;">
     <!-- WEEKLY_SUMMARY_START -->
-    <p style="font-weight:700; margin-bottom:8px;">Week of July 16, 2026</p>
-    <p style="color:#9ba3af; margin-bottom:10px;">This is the first live refresh of this dashboard — the baseline snapshot was taken today, so there is nothing to compare against yet. Next week's refresh will show real week-over-week pipeline movement.</p>
+    <p style="font-weight:700; margin-bottom:8px;">Week of July 17, 2026</p>
+    <p style="color:#9ba3af; margin-bottom:10px;">Compared against the July 16, 2026 snapshot (one day prior — this dashboard's baseline was only just established). No stage, close-quarter, or win/loss movement registered in that window.</p>
     <p class="lbl-sub" style="font-weight:700; margin-top:10px;">Closed Won this week, was Stage 3+ (0)</p>
     <ul style="margin:4px 0 10px 20px;"><li>None this week</li></ul>
     <p class="lbl-sub" style="font-weight:700; margin-top:10px;">Closed Lost this week, was Stage 3+ (0)</p>
@@ -109,6 +166,33 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
 
   <div class="section-title">Rep productivity <span class="hint">Open pipe by stage, closed FYTD, coverage vs. remaining quota</span></div>
   <div class="table-card" style="overflow-x:auto"><table id="repTable"></table></div>
+</div>
+
+<div class="tab-pane" id="tab-health">
+  <div class="custarr-summary">
+    <div class="custarr-stat"><div class="cs-label">Total Customers</div><div class="cs-value" id="ch-total">—</div><div class="cs-sub">active ARR</div></div>
+    <div class="custarr-stat"><div class="cs-label">Total ARR</div><div class="cs-value" id="ch-arr">—</div><div class="cs-sub">current</div></div>
+    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-red"></span>Red</div><div class="cs-value" id="ch-red">—</div><div class="cs-sub">Pulse 1–2</div></div>
+    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-yellow"></span>Yellow</div><div class="cs-value" id="ch-yellow">—</div><div class="cs-sub">Pulse 3</div></div>
+    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-green"></span>Green</div><div class="cs-value" id="ch-green">—</div><div class="cs-sub">Pulse 4–5</div></div>
+  </div>
+
+  <div class="section-title">Customer health <span class="hint">ARR base from Salesforce · Relationship Health Pulse (CSM) · 4-week AMPs usage vs. prior 4 weeks</span></div>
+  <div class="custarr-controls">
+    <input type="text" id="chSearch" placeholder="Search customers…" oninput="filterHealthTable()">
+    <label>Type: <select id="chTypeFilter" onchange="filterHealthTable()">
+      <option value="">All</option><option value="Subscription">Subscription</option><option value="Consumption">Consumption</option>
+    </select></label>
+    <label>Health: <select id="chHealthFilter" onchange="filterHealthTable()">
+      <option value="">All</option><option value="red">Red</option><option value="yellow">Yellow</option><option value="green">Green</option>
+    </select></label>
+  </div>
+  <div class="table-card" style="overflow-x:auto; max-height:640px; overflow-y:auto;">
+    <table class="custarr-table" id="healthTable"></table>
+  </div>
+  <div class="custarr-count" id="ch-count"></div>
+</div>
+
 </div>
 
 <script>
@@ -212,6 +296,58 @@ const Q = {
       AND ROLE_TYPE IN ('AE','RVP')
       AND (IS_ACTIVE = TRUE OR IS_ACTIVE IS NULL)
     GROUP BY ROLE_TYPE, NAME, MANAGER_NAME, MONTH_START`,
+
+  // Customer Health: same base as the monthly dashboard's Customer ARR tab
+  // (PROD.DEALSBASE.CUSTOMER_ACCOUNT_MAP joined to PROD.SALESFORCE.ACCOUNTS),
+  // plus: Relationship Health Pulse (CSM) from the raw Salesforce Account object
+  // (not yet mirrored into the cleaned PROD.SALESFORCE.ACCOUNTS table), contract
+  // start date, and a 4-week vs. prior-4-week AMPs usage comparison from
+  // PROD.FISHBOWL.AMPS.
+  customerHealth: `
+    WITH sf_customers AS (
+      SELECT
+        cam.CUSTOMER_ID,
+        cam.CUSTOMER_NAME,
+        cam.ACCOUNT_ID,
+        SUM(a.ARR) AS ARR,
+        TO_CHAR(MAX(a.CONTRACT_END_DT), 'YYYY-MM-DD') AS CONTRACT_END_DT,
+        TO_CHAR(MIN(a.CONTRACT_START_DT), 'YYYY-MM-DD') AS CONTRACT_START_DT,
+        CASE WHEN MAX(CASE WHEN a.CONSUMPTION_TYPE IS NOT NULL AND a.CONSUMPTION_TYPE != '' THEN 1 ELSE 0 END) = 1
+          THEN 'Consumption' ELSE 'Subscription' END AS CONTRACT_TYPE
+      FROM PROD.DEALSBASE.CUSTOMER_ACCOUNT_MAP cam
+      JOIN PROD.SALESFORCE.ACCOUNTS a ON cam.ACCOUNT_ID = a.ACCOUNT_ID
+      WHERE a.TYPE = 'Customer' AND a.ARR > 0
+      GROUP BY cam.CUSTOMER_ID, cam.CUSTOMER_NAME, cam.ACCOUNT_ID
+    ),
+    sf_vertical AS (
+      SELECT cam.CUSTOMER_ID, a.VERTICAL, COUNT(*) AS cnt
+      FROM PROD.DEALSBASE.CUSTOMER_ACCOUNT_MAP cam
+      JOIN PROD.SALESFORCE.ACCOUNTS a ON cam.ACCOUNT_ID = a.ACCOUNT_ID
+      WHERE a.VERTICAL IS NOT NULL AND a.VERTICAL != ''
+      GROUP BY cam.CUSTOMER_ID, a.VERTICAL
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY cam.CUSTOMER_ID ORDER BY cnt DESC) = 1
+    ),
+    pulse AS (
+      SELECT ID AS ACCOUNT_ID, RELATIONSHIP_HEALTH_PULSE_CSM_C AS PULSE
+      FROM LOAD.SALESFORCE_RAW.ACCOUNT
+    ),
+    usage_agg AS (
+      SELECT SALESFORCE_ACCOUNT_ID,
+        SUM(CASE WHEN USAGE_DATE >= DATEADD(day,-28,CURRENT_DATE()) THEN AMPS_AMOUNT ELSE 0 END) / 28.0 AS CURR_4WK_AVG,
+        SUM(CASE WHEN USAGE_DATE >= DATEADD(day,-56,CURRENT_DATE()) AND USAGE_DATE < DATEADD(day,-28,CURRENT_DATE()) THEN AMPS_AMOUNT ELSE 0 END) / 28.0 AS PRIOR_4WK_AVG
+      FROM PROD.FISHBOWL.AMPS
+      WHERE USAGE_DATE >= DATEADD(day,-56,CURRENT_DATE()) AND TENANT_IS_SANDBOX = FALSE
+      GROUP BY SALESFORCE_ACCOUNT_ID
+    )
+    SELECT
+      c.CUSTOMER_NAME, c.ARR, c.CONTRACT_TYPE, c.CONTRACT_START_DT, c.CONTRACT_END_DT,
+      COALESCE(v.VERTICAL, '') AS VERTICAL,
+      p.PULSE, u.CURR_4WK_AVG, u.PRIOR_4WK_AVG
+    FROM sf_customers c
+    LEFT JOIN sf_vertical v ON c.CUSTOMER_ID = v.CUSTOMER_ID
+    LEFT JOIN pulse p ON c.ACCOUNT_ID = p.ACCOUNT_ID
+    LEFT JOIN usage_agg u ON c.ACCOUNT_ID = u.SALESFORCE_ACCOUNT_ID
+    ORDER BY c.ARR DESC`,
 };
 
 // ─── PRE-PROCESS ──────────────────────────────────────
@@ -265,6 +401,53 @@ function preProcessTargets(rows){
     }
   }
   return { aeManager, aeAnnual, aeYtd, aeQtr, aeNames: Object.keys(aeAnnual) };
+}
+
+function preProcessCustomerHealth(rows){
+  return rows.map(r => {
+    const pulseRaw = r.PULSE || '';
+    const score = pulseRaw ? parseInt(pulseRaw, 10) : null;
+    const curr = r.CURR_4WK_AVG!=null ? +r.CURR_4WK_AVG : null;
+    const prior = r.PRIOR_4WK_AVG!=null ? +r.PRIOR_4WK_AVG : null;
+    const variance = (curr!=null && prior) ? (curr-prior)/prior : null;
+    return {
+      name: r.CUSTOMER_NAME, arr: +(r.ARR||0), contractType: r.CONTRACT_TYPE,
+      contractStart: r.CONTRACT_START_DT||'', contractEnd: r.CONTRACT_END_DT||'',
+      vertical: r.VERTICAL||'', pulse: pulseRaw, pulseScore: (score!=null && !isNaN(score))?score:null,
+      currUsage: curr, priorUsage: prior, variance,
+    };
+  });
+}
+
+function healthClass(score){
+  if(score==null) return 'unk';
+  if(score<=2) return 'red';
+  if(score===3) return 'yellow';
+  return 'green';
+}
+
+function healthDot(score){ return `<span class="health-dot health-${healthClass(score)}"></span>`; }
+
+function tagHtml(type) {
+  const cls = type==='Subscription'?'tag-sub':type==='Consumption'?'tag-con':'tag-unk';
+  return `<span class="tag ${cls}">${type}</span>`;
+}
+
+function fmtDateShort(dt) {
+  if(!dt) return '<span style="color:#9ba3af">—</span>';
+  const d = new Date(dt);
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+
+function fmtContractEnd(dt) {
+  if(!dt) return '<span style="color:#9ba3af">—</span>';
+  const d = new Date(dt);
+  const today = new Date();
+  const daysOut = (d - today) / 86400000;
+  const label = d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  if (daysOut < 90)  return `<span class="contract-end-soon">${label}</span>`;
+  if (daysOut < 180) return `<span class="contract-end-near">${label}</span>`;
+  return label;
 }
 
 // ─── BUILD ────────────────────────────────────────────
@@ -445,6 +628,93 @@ function buildRepTable(deals, closed, tgt){
   document.getElementById('repTable').innerHTML = h;
 }
 
+let healthData = [];
+let healthSortCol = 1, healthSortAsc = false; // default: ARR desc
+
+function buildHealthCards(rows){
+  const totalARR = rows.reduce((s,r)=>s+r.arr,0);
+  document.getElementById('ch-total').textContent = rows.length;
+  document.getElementById('ch-arr').textContent = '$' + N(Math.round(totalARR/1e6),1) + 'M';
+  document.getElementById('ch-red').textContent = rows.filter(r=>healthClass(r.pulseScore)==='red').length;
+  document.getElementById('ch-yellow').textContent = rows.filter(r=>healthClass(r.pulseScore)==='yellow').length;
+  document.getElementById('ch-green').textContent = rows.filter(r=>healthClass(r.pulseScore)==='green').length;
+}
+
+function filterHealthTable(){
+  const q = document.getElementById('chSearch').value.toLowerCase();
+  const type = document.getElementById('chTypeFilter').value;
+  const health = document.getElementById('chHealthFilter').value;
+  const filtered = healthData.filter(r => {
+    if(q && !r.name.toLowerCase().includes(q)) return false;
+    if(type && r.contractType !== type) return false;
+    if(health && healthClass(r.pulseScore) !== health) return false;
+    return true;
+  });
+  renderHealthTable(filtered);
+}
+
+function sortHealthTable(col){
+  if(healthSortCol === col) { healthSortAsc = !healthSortAsc; }
+  else { healthSortCol = col; healthSortAsc = (col===0); }
+  filterHealthTable();
+}
+
+function renderHealthTable(rows){
+  const getVal = (r,col) => [
+    r.name, r.arr, r.contractType, r.contractStart, r.contractEnd,
+    r.pulseScore==null?-1:r.pulseScore, r.currUsage==null?-1:r.currUsage,
+    r.variance==null?-999:r.variance, r.vertical
+  ][col];
+  const sorted = [...rows].sort((a,b) => {
+    const av = getVal(a, healthSortCol), bv = getVal(b, healthSortCol);
+    if(typeof av==='number') return healthSortAsc ? av-bv : bv-av;
+    return healthSortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+  });
+
+  const headers = ['Customer','ARR','Type','Contract Start','Contract End','Pulse (CSM)','4-Wk Avg Usage','vs. Prior 4-Wk','Vertical'];
+  let thead = '<thead><tr>';
+  headers.forEach((h,i) => {
+    const cls = healthSortCol===i ? (healthSortAsc?'sort-asc':'sort-desc') : '';
+    thead += `<th class="${cls}" onclick="sortHealthTable(${i})">${h}</th>`;
+  });
+  thead += '</tr></thead>';
+
+  let body = '<tbody>';
+  for (const r of sorted) {
+    const arrK = '$' + N(Math.round(r.arr/1e3)) + 'K';
+    const varCls = r.variance==null ? 'var-flat' : r.variance>0.02 ? 'var-good' : r.variance<-0.02 ? 'var-bad' : 'var-flat';
+    const varTxt = r.variance==null ? '<span style="color:#9ba3af">—</span>' : (r.variance>=0?'+':'') + PCT(r.variance,1);
+    body += `<tr>
+      <td title="${r.name}">${healthDot(r.pulseScore)}${r.name}</td>
+      <td>${arrK}</td>
+      <td class="td-center">${tagHtml(r.contractType)}</td>
+      <td>${fmtDateShort(r.contractStart)}</td>
+      <td>${fmtContractEnd(r.contractEnd)}</td>
+      <td class="td-left">${r.pulse || '<span style="color:#9ba3af">—</span>'}</td>
+      <td>${r.currUsage!=null ? N(Math.round(r.currUsage)) : '<span style="color:#9ba3af">—</span>'}</td>
+      <td class="${varCls}">${varTxt}</td>
+      <td class="td-left">${r.vertical || '<span style="color:#9ba3af">—</span>'}</td>
+    </tr>`;
+  }
+  body += '</tbody>';
+
+  document.getElementById('healthTable').innerHTML = thead + body;
+  document.getElementById('ch-count').textContent = `Showing ${rows.length} of ${healthData.length} customers`;
+}
+
+function buildHealthTable(rows){
+  healthData = rows;
+  buildHealthCards(rows);
+  renderHealthTable(rows);
+}
+
+function showTab(name){
+  document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('tabBtn-'+name).classList.add('active');
+}
+
 // ─── MAIN ─────────────────────────────────────────────
 async function waitForCowork(timeout=5000) {
   const start=Date.now();
@@ -459,18 +729,20 @@ async function loadAll() {
   try {
     msg.textContent = 'Connecting to Snowflake…';
     await waitForCowork();
-    msg.textContent = 'Fetching pipeline, closed deals, and quotas…';
-    const [pipeRows, closedRows, tgtRows] = await Promise.all([
-      execSQL(Q.pipeline), execSQL(Q.closedFYTD), execSQL(Q.salesTargets)
+    msg.textContent = 'Fetching pipeline, closed deals, quotas, and customer health…';
+    const [pipeRows, closedRows, tgtRows, healthRows] = await Promise.all([
+      execSQL(Q.pipeline), execSQL(Q.closedFYTD), execSQL(Q.salesTargets), execSQL(Q.customerHealth)
     ]);
     msg.textContent = 'Building dashboard…';
     const deals = preProcessPipeline(pipeRows);
     const closed = preProcessClosed(closedRows);
     const tgt = preProcessTargets(tgtRows);
+    const health = preProcessCustomerHealth(healthRows);
 
     buildCards(deals, closed, tgt);
     buildCoverage(deals, tgt);
     buildRepTable(deals, closed, tgt);
+    buildHealthTable(health);
 
     document.getElementById('loadingOverlay').style.display = 'none';
   } catch (e) {
