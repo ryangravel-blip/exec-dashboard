@@ -4,85 +4,47 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
-<title>MRP Dashboard — Live</title>
+<title>Amperity — Real-Time Dashboards</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
 <style>
 :root { color-scheme: light; }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; background: #f0f2f5; color: #1a1a2e; }
 
-#loadingOverlay { position: fixed; inset: 0; background: rgba(26,26,46,0.88); display: flex; align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 16px; }
-.spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.2); border-top-color: #80C7D1; border-radius: 50%; animation: spin 0.8s linear infinite; }
+#loadingOverlay { position: fixed; inset: 0; background: rgba(12,12,12,0.92); display: flex; align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 16px; }
+.spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.2); border-top-color: #E9FF5F; border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 #loadingMsg { color: #e2e8f0; font-size: 13px; }
 
-.page-header { background: #1a1a2e; color: #fff; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+.page-header { background: #0C0C0C; color: #fff; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
 .page-header h1 { font-size: 17px; font-weight: 600; letter-spacing: .3px; }
 .page-header .subtitle { font-size: 12px; color: #9ba3af; margin-top: 2px; }
-.period-badge { background: #2d3748; border-radius: 6px; padding: 5px 12px; font-size: 12px; color: #e2e8f0; white-space: nowrap; }
+.live-badge { background: #1a3a1a; border: 1px solid #2f6b2f; border-radius: 6px; padding: 5px 12px; font-size: 11px; color: #7ee787; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: #7ee787; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
 
-.tab-bar { background: #1a1a2e; padding: 0 20px; display: flex; gap: 2px; overflow-x: auto; border-bottom: 2px solid #2d3748; }
-.tab-bar::-webkit-scrollbar { height: 4px; }
-.tab-bar::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 2px; }
-.tab-btn { background: none; border: none; cursor: pointer; padding: 9px 14px; font-size: 12px; font-weight: 500; color: #9ba3af; border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap; transition: color .15s; }
+.content { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+
+.cards-row { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+.stat-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 14px 18px; min-width: 170px; flex: 1; }
+.stat-card .sc-label { font-size: 10.5px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+.stat-card .sc-value { font-size: 22px; font-weight: 700; color: #0C0C0C; }
+.stat-card .sc-sub { font-size: 11px; color: #9ba3af; margin-top: 3px; }
+.stat-card.warn .sc-value { color: #b91c1c; }
+.stat-card.good .sc-value { color: #15803d; }
+
+.section-title { font-size: 14px; font-weight: 700; color: #0C0C0C; margin: 26px 0 10px; display: flex; align-items: center; gap: 8px; }
+.section-title .hint { font-weight: 400; font-size: 11px; color: #9ba3af; }
+
+/* Tab nav */
+.tab-nav { display: flex; gap: 4px; }
+.tab-btn { background: transparent; border: none; color: #9ba3af; font-size: 12.5px; font-weight: 600; padding: 8px 14px; border-radius: 6px 6px 0 0; cursor: pointer; }
 .tab-btn:hover { color: #e2e8f0; }
-.tab-btn.active { color: #63b3ed; border-bottom-color: #63b3ed; }
+.tab-btn.active { background: #1a1a1a; color: #fff; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
 
-.content { padding: 20px 24px; }
-.tab-panel { display: none; }
-.tab-panel.active { display: block; }
-
-.table-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; margin-bottom: 20px; }
-.table-title { padding: 12px 16px 10px; font-size: 14px; font-weight: 600; color: #1a1a2e; border-bottom: 1px solid #e8ecf0; display: flex; align-items: center; justify-content: space-between; }
-.bud-badge { font-size: 10px; font-weight: 500; background: #e8f0fe; color: #1e3a8a; border-radius: 4px; padding: 2px 7px; }
-
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { padding: 6px 10px; text-align: right; white-space: nowrap; font-size: 12.5px; }
-.data-table td.label-col { text-align: left; font-weight: 400; color: #374151; padding-left: 12px; }
-.data-table td.label-indent { text-align: left; font-weight: 400; color: #374151; padding-left: 28px; }
-
-/* Period group headers */
-.data-table thead tr.group-header th { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 6px 10px; border: none; }
-.data-table thead tr.group-header th.label-col { background: #2d3748; }
-.hdr-m { background: #3a4a5c; color: #e2e8f0; }
-.hdr-q { background: #344155; color: #e2e8f0; }
-.hdr-y { background: #2e3a4e; color: #e2e8f0; }
-.hdr-spacer { width: 8px; background: #1a1a2e !important; }
-
-.data-table thead tr.col-header th { background: #f8fafc; color: #6b7280; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; border-bottom: 2px solid #e5e7eb; }
-.data-table thead tr.col-header th.label-col { text-align: left; background: #f8fafc; }
-.col-m { background: #ffffff; }
-.col-mb { background: #f5f7fa; }
-.col-mv { background: #f8f9fb; }
-.col-q { background: #f0f4f8; }
-.col-qb { background: #eaeff5; }
-.col-qv { background: #ecf0f6; }
-.col-y { background: #e8eef4; }
-.col-yb { background: #e0e8f0; }
-.col-yv { background: #e4ecf2; }
-.divider-left { border-left: 2px solid #d1d5db !important; }
-
-.data-table tbody tr:nth-child(even) td { filter: brightness(.97); }
-.data-table tbody tr:hover td { background: #ebf4ff !important; filter: none; }
-.row-section td { background: #f1f5f9 !important; font-weight: 700; font-size: 11.5px; color: #1e293b; text-transform: uppercase; letter-spacing: .4px; padding-top: 8px; padding-bottom: 8px; }
-.row-section td.label-col, .row-section td.label-indent { text-align: left; }
-.row-subtotal td { background: #e9edf2 !important; font-weight: 600; border-top: 1px solid #cbd5e0; }
-.row-total td { background: #d6dde6 !important; font-weight: 700; border-top: 2px solid #94a3b8; }
-.row-margin td { background: #fafafa !important; font-style: italic; color: #4b5563; }
-.row-spacer td { height: 6px; background: #f8fafc !important; border: none; }
-.row-manager td { background: #e8f0fe !important; font-weight: 600; color: #1e3a8a; }
-
-/* Variance colours */
-.var-good  { color: #15803d; font-weight: 600; }
-.var-bad   { color: #dc2626; font-weight: 600; }
-.var-flat  { color: #6b7280; }
-
-/* TTM */
-.ttm-table th { font-size: 10px; padding: 5px 7px; }
-.ttm-table td { font-size: 11px; padding: 5px 7px; }
-.ttm-col-ttm { background: #e8eef4 !important; font-weight: 700; border-left: 2px solid #94a3b8; }
-
-/* Customer ARR tab */
+/* Customer Health tab */
 .custarr-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
 .custarr-controls input[type=text], .custarr-controls select {
   font-size: 12px; padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px;
@@ -99,7 +61,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .tag { display: inline-block; font-size: 10px; font-weight: 600; border-radius: 4px; padding: 2px 7px; white-space: nowrap; }
 .tag-sub { background: #CAEFEF; color: #155e75; }
 .tag-con { background: #fef3c7; color: #92400e; }
-.tag-both { background: #ede9fe; color: #4c1d95; }
 .tag-unk { background: #f1f5f9; color: #6b7280; }
 .custarr-table { width: 100%; border-collapse: collapse; }
 .custarr-table th { position: sticky; top: 0; background: #f8fafc; color: #6b7280; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 8px 10px; border-bottom: 2px solid #e5e7eb; cursor: pointer; white-space: nowrap; user-select: none; }
@@ -114,70 +75,47 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .custarr-table td.td-left { text-align: left; }
 .custarr-table tbody tr:hover td { background: #ebf4ff !important; }
 .custarr-table tbody tr:nth-child(even) td { background: #fcfcfc; }
-.custarr-table tbody tr.health-red td    { background: #fef2f2; }
-.custarr-table tbody tr.health-yellow td { background: #fefce8; }
-.custarr-table tbody tr.health-green td  { background: #f0fdf4; }
-.custarr-table tbody tr.health-red:hover td    { background: #fecaca !important; }
-.custarr-table tbody tr.health-yellow:hover td { background: #fef08a !important; }
-.custarr-table tbody tr.health-green:hover td  { background: #bbf7d0 !important; }
-.score-cell { font-variant-numeric: tabular-nums; }
-.score-na { color: #d1d5db; }
 .custarr-count { font-size: 11px; color: #9ba3af; margin-top: 8px; }
 .contract-end-soon { color: #dc2626; font-weight: 600; }
 .contract-end-near  { color: #d97706; font-weight: 600; }
-.custarr-row { display: flex; gap: 16px; margin-bottom: 16px; align-items: flex-start; }
-.custarr-pie-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 12px 16px 16px; flex: 0 0 320px; overflow: hidden; }
-.custarr-pie-card .pie-title { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 12px; }
+.var-good  { color: #15803d; font-weight: 600; }
+.var-bad   { color: #dc2626; font-weight: 600; }
+.var-flat  { color: #6b7280; }
+.health-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; vertical-align: middle; flex: none; }
+.health-red { background: #dc2626; }
+.health-yellow { background: #d97706; }
+.health-green { background: #15803d; }
+.health-unk { background: #d1d5db; }
 
-/* Charts */
-.charts-row { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
-.chart-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 12px 16px 16px; flex: 1; min-width: 280px; overflow: hidden; }
-.chart-card.wide { flex: 2; min-width: 400px; overflow: hidden; }
-.chart-title { font-size: 13px; font-weight: 600; color: #1a1a2e; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e8ecf0; }
-.chart-subtitle { font-size: 11px; color: #6b7280; margin-top: 2px; }
+.table-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; margin-bottom: 20px; }
+.chart-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 16px; margin-bottom: 20px; height: 260px; }
 
-/* Q1 Slide */
-#tab-qs { background: #f0f2f5; }
-.slide-frame { background: #fff; max-width: 1260px; margin: 0 auto; border-radius: 6px; box-shadow: 0 4px 24px rgba(0,0,0,.15); overflow: hidden; }
-.sl-header { background: #0C0C0C; padding: 18px 28px 16px; display: flex; align-items: flex-end; justify-content: space-between; }
-.sl-header h1 { font-size: 26px; font-weight: 800; color: #fff; letter-spacing: -.3px; line-height: 1.15; }
-.sl-header h1 span { color: #E9FF5F; }
-.sl-period { text-align: right; font-size: 11.5px; color: #9ba3af; line-height: 1.6; }
-.sl-period strong { color: #E7EDEF; font-weight: 600; display: block; font-size: 13px; }
-.sl-body { display: flex; min-height: 520px; }
-.sl-left { flex: 0 0 300px; padding: 20px 20px 16px; border-right: 1px solid #e8ecf0; display: flex; flex-direction: column; }
-.sl-group { margin-bottom: 14px; }
-.sl-group-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #9ba3af; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 2px solid #f0f2f5; }
-.sl-kpi { display: flex; align-items: flex-start; gap: 7px; padding: 3px 0; border-bottom: 1px solid #f8fafc; }
-.sl-kpi:last-child { border-bottom: none; }
-.sl-kpi::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: #80C7D1; flex-shrink: 0; margin-top: 6px; }
-.sl-kpi p { font-size: 11.5px; color: #374151; line-height: 1.4; margin: 0; }
-.sl-kpi p strong { color: #0C0C0C; font-weight: 700; }
-.sl-kpi p em { color: #6b7280; font-style: normal; font-size: 10.5px; }
-.sl-kpi .good { color: #15803d; font-weight: 700; }
-.sl-kpi .bad  { color: #b91c1c; font-weight: 700; }
-.sl-footnote { font-size: 10px; color: #9ba3af; font-style: italic; margin-top: auto; padding-top: 10px; }
-.sl-right { flex: 1; overflow-x: auto; }
-.sl-tbl { width: 100%; border-collapse: collapse; font-size: 11.5px; }
-.sl-tbl th, .sl-tbl td { padding: 5px 10px; text-align: right; white-space: nowrap; }
-.sl-tbl td.sl-l  { text-align: left; padding-left: 12px; color: #374151; }
-.sl-tbl td.sl-li { text-align: left; padding-left: 24px; color: #4b5563; font-size: 11px; }
-.sl-tbl thead tr th { padding: 7px 10px; font-size: 10px; font-weight: 700; border-bottom: 2px solid #e5e7eb; }
-.th-bud { background: #E7EDEF; color: #374151; }
-.th-act { background: #E9FF5F; color: #0C0C0C; }
-.th-var { background: #f8fafc; color: #6b7280; }
-.th-lbl { background: #fff; text-align: left !important; color: #6b7280; min-width: 160px; }
-.sl-tbl .sr td { background: #0C0C0C; color: #E7EDEF; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; }
-.sl-tbl .sr td.sl-l { padding-left: 12px; }
-.sl-tbl .st td { background: #f5ffc0; font-weight: 700; border-top: 1px solid #d1d5db; }
-.sl-tbl .sm td { background: #fafafa; font-style: italic; color: #6b7280; font-size: 11px; }
-.sl-tbl .sp td { height: 3px; background: #f8fafc; padding: 0; }
-.sl-tbl tbody tr:nth-child(even):not(.sr):not(.st):not(.sm):not(.sp) td { background: #fcfcfc; }
-.sl-tbl tbody tr:nth-child(even):not(.sr):not(.st):not(.sm):not(.sp) td.act-col { background: #fffff5; }
-.act-col { background: #fffff0; border-left: 1px solid #e8e000 !important; border-right: 1px solid #e8e000 !important; }
-.vg { color: #15803d; font-weight: 600; }
-.vb { color: #b91c1c; font-weight: 600; }
-.vn { color: #9ba3af; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 7px 10px; text-align: right; white-space: nowrap; font-size: 12.5px; }
+td.lbl { text-align: left; font-weight: 400; color: #374151; }
+td.lbl-indent { text-align: left; font-weight: 400; color: #374151; padding-left: 26px; }
+td.lbl-sub { text-align: left; font-weight: 700; color: #1a1a2e; }
+thead th { background: #f8fafc; color: #6b7280; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; border-bottom: 2px solid #e5e7eb; }
+thead th.th-lbl { text-align: left; }
+tbody tr.mgr-row { background: #f8fafc; border-top: 1px solid #e5e7eb; }
+tbody tr.mgr-row td { font-weight: 700; }
+tbody tr.ae-row td { border-top: 1px solid #f1f5f9; }
+tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
+.cov-good { color: #15803d; font-weight: 700; }
+.cov-warn { color: #b45309; font-weight: 700; }
+.cov-bad { color: #b91c1c; font-weight: 700; }
+.err-box { background: #fff; border-radius: 8px; border: 1px solid #fecaca; padding: 16px; color: #b91c1c; font-size: 12.5px; }
+
+/* Rep productivity table: tightened columns + sectioned group header so it fits
+   without horizontal scroll on a normal-width screen. */
+#repTable { table-layout: fixed; }
+#repTable th, #repTable td { padding: 5px 3px; font-size: 10.8px; white-space: normal; word-break: break-word; line-height: 1.25; }
+#repTable td.lbl-indent, #repTable td.lbl-sub { padding-left: 10px; }
+#repTable thead tr.grp-hdr th { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; padding: 5px 3px; border-bottom: 1px solid rgba(0,0,0,.06); text-align: center; }
+#repTable thead tr.grp-hdr th.grp-rep { background: #f8fafc; text-align: left; }
+#repTable thead tr.grp-hdr th.grp-1 { background: #eef2f7; color: #475569; }
+#repTable thead tr.grp-hdr th.grp-2 { background: #e7f5f7; color: #0e6a76; }
+#repTable thead tr.grp-hdr th.grp-3 { background: #fbfbe0; color: #7a6c00; }
 </style>
 </head>
 <body>
@@ -189,380 +127,152 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 <div class="page-header">
   <div>
-    <h1>Monthly Reporting Package</h1>
-    <div class="subtitle">Amperity &nbsp;·&nbsp; June 2026 — YTD FY27</div>
+    <h1>Real-Time Dashboards</h1>
+    <div class="subtitle">Amperity &nbsp;·&nbsp; Live, queried on every page load</div>
   </div>
-  <div class="period-badge">Current Month: Jun-26 &nbsp;|&nbsp; QTD: May–Jun &nbsp;|&nbsp; YTD: Feb–Jun FY27</div>
-</div>
-
-<div class="tab-bar">
-  <button class="tab-btn active" onclick="switchTab('exec',this)">Executive Summary</button>
-  <button class="tab-btn" onclick="switchTab('arr',this)">ARR Overview</button>
-  <button class="tab-btn" onclick="switchTab('sales',this)">Sales Performance</button>
-  <button class="tab-btn" onclick="switchTab('rev',this)">Revenue Overview</button>
-  <button class="tab-btn" onclick="switchTab('ttm',this)">Revenue TTM</button>
-  <button class="tab-btn" onclick="switchTab('cash',this)">Cash Flow</button>
-  <button class="tab-btn" onclick="switchTab('svc',this)">Services P&amp;L</button>
-  <button class="tab-btn" onclick="switchTab('exp',this)">P&amp;L by Expense</button>
-  <button class="tab-btn" onclick="switchTab('dept',this)">P&amp;L by Department</button>
-  <button class="tab-btn" onclick="switchTab('hc',this)">Headcount</button>
-  <button class="tab-btn" onclick="switchTab('qs',this)">FY27 - YTD</button>
-  <button class="tab-btn" onclick="switchTab('custarr',this)">Customer ARR</button>
-</div>
-
-<div class="content">
-
-<!-- Shared thead macro (9-col with budget) injected via JS -->
-
-<!-- 1. EXECUTIVE SUMMARY -->
-<div id="tab-exec" class="tab-panel active">
-<div class="table-card">
-  <div class="table-title">Executive Summary — Jun 2026 <span class="bud-badge">Budget: FY27 BoD Approved</span></div>
-  <div style="overflow-x:auto"><table class="data-table" id="execTable">
-    <thead id="execHead"></thead>
-    <tbody id="execBody"><tr><td class="label-col" colspan="13" style="color:#9ba3af;padding:20px">Loading…</td></tr></tbody>
-  </table></div>
-</div>
-</div>
-
-<!-- 2. ARR OVERVIEW -->
-<div id="tab-arr" class="tab-panel">
-<div class="charts-row">
-  <div class="chart-card"><div class="chart-title">ARR Bridge — YTD <span class="chart-subtitle">$K</span></div><canvas id="arrBridgeChart" height="140"></canvas></div>
-  <div class="chart-card"><div class="chart-title">Monthly New + Expansion ARR <span class="chart-subtitle">$K</span></div><canvas id="arrMonthlyChart" height="140"></canvas></div>
-</div>
-<div class="table-card">
-  <div class="table-title">ARR Overview — Jun 2026 <span class="bud-badge">Budget: FY27 BoD Approved</span></div>
-  <div style="overflow-x:auto"><table class="data-table" id="arrTable">
-    <thead id="arrHead"></thead>
-    <tbody id="arrBody"><tr><td class="label-col" colspan="13" style="color:#9ba3af;padding:20px">Loading…</td></tr></tbody>
-  </table></div>
-</div>
-</div>
-
-<!-- 3. SALES PERFORMANCE -->
-<div id="tab-sales" class="tab-panel">
-<div class="table-card">
-  <div class="table-title">Sales Performance — Jun 2026 <span class="bud-badge">Target: FY27 Prorated Quota</span></div>
-  <div style="overflow-x:auto"><table class="data-table">
-    <thead id="salesHead"></thead>
-    <tbody id="salesBody"><tr><td class="label-col" colspan="13" style="color:#9ba3af;padding:20px">Loading…</td></tr></tbody>
-  </table></div>
-</div>
-</div>
-
-<!-- 4. REVENUE OVERVIEW -->
-<div id="tab-rev" class="tab-panel">
-<div class="charts-row">
-  <div class="chart-card wide"><div class="chart-title">Monthly Revenue — Actuals vs Budget <span class="chart-subtitle">$K</span></div><canvas id="revMonthlyChart" height="130"></canvas></div>
-</div>
-<div class="table-card">
-  <div class="table-title">Revenue Overview — Jun 2026 <span class="bud-badge">Budget: FY27 BoD Approved</span></div>
-  <div style="overflow-x:auto"><table class="data-table" id="revTable">
-    <thead id="revHead"></thead>
-    <tbody id="revBody"><tr><td class="label-col" colspan="13" style="color:#9ba3af;padding:20px">Loading…</td></tr></tbody>
-  </table></div>
-</div>
-</div>
-
-<!-- 5. REVENUE TTM -->
-<div id="tab-ttm" class="tab-panel">
-<div class="charts-row">
-  <div class="chart-card wide"><div class="chart-title">Revenue Mix — TTM Stacked <span class="chart-subtitle">$K</span></div><canvas id="ttmStackChart" height="120"></canvas></div>
-</div>
-<div class="table-card">
-  <div class="table-title">Revenue Mix — Trailing Twelve Months (Jul 2025 – Jun 2026)</div>
-  <div style="overflow-x:auto"><table class="data-table ttm-table">
-    <thead><tr class="col-header"><th class="label-col" style="min-width:150px"></th><th>Jul-25</th><th>Aug-25</th><th>Sep-25</th><th>Oct-25</th><th>Nov-25</th><th>Dec-25</th><th>Jan-26</th><th>Feb-26</th><th>Mar-26</th><th>Apr-26</th><th>May-26</th><th>Jun-26</th><th class="ttm-col-ttm">TTM</th></tr></thead>
-    <tbody id="ttmBody"><tr><td class="label-col" colspan="14" style="color:#9ba3af;padding:20px">Loading…</td></tr></tbody>
-  </table></div>
-</div>
-</div>
-
-<!-- 6. CASH FLOW -->
-<div id="tab-cash" class="tab-panel">
-<div class="charts-row">
-  <div class="chart-card wide"><div class="chart-title">Monthly Cash Burn — Actuals vs Budget <span class="chart-subtitle">$K</span></div><canvas id="cashMonthlyChart" height="130"></canvas></div>
-</div>
-<div class="table-card">
-  <div class="table-title">Cash Flow — Jun 2026 <span class="bud-badge">Budget: FY27 BoD Approved</span></div>
-  <div style="overflow-x:auto"><table class="data-table" id="cashTable">
-    <thead id="cashHead"></thead>
-    <tbody id="cashBody"><tr><td class="label-col" colspan="13" style="color:#9ba3af;padding:20px">Loading…</td></tr></tbody>
-  </table></div>
-</div>
-</div>
-
-<!-- 7. SERVICES P&L -->
-<div id="tab-svc" class="tab-panel">
-<div class="table-card">
-  <div class="table-title">Services P&amp;L — Jun 2026 <span class="bud-badge">Budget: FY27 BoD Approved</span></div>
-  <div style="overflow-x:auto"><table class="data-table" id="svcTable">
-    <thead id="svcHead"></thead>
-    <tbody id="svcBody"><tr><td class="label-col" colspan="13" style="color:#9ba3af;padding:20px">Loading…</td></tr></tbody>
-  </table></div>
-</div>
-</div>
-
-<!-- 8. P&L BY EXPENSE -->
-<div id="tab-exp" class="tab-panel">
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-  <label style="font-size:11px;color:#6b7280;font-weight:600;white-space:nowrap;">View by:</label>
-  <select id="expDeptSelect" onchange="rebuildExpense()" style="font-size:12px;padding:5px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#1a1a2e;outline:none;cursor:pointer;">
-    <option value="">All Departments</option>
-    <option value="COGS: Infrastructure">COGS: Infrastructure</option>
-    <option value="COGS: Services">COGS: Services</option>
-    <option value="Engineering">Engineering</option>
-    <option value="Product">Product</option>
-    <option value="Customer Success">Customer Success</option>
-    <option value="Sales">Sales</option>
-    <option value="Marketing">Marketing</option>
-    <option value="G&A">G&A</option>
-  </select>
-</div>
-<div class="charts-row">
-  <div class="chart-card wide"><div class="chart-title">YTD Expense by Category — Actuals vs Budget <span class="chart-subtitle">$K</span></div><canvas id="expCatChart" height="140"></canvas></div>
-</div>
-<div class="table-card">
-  <div class="table-title">P&amp;L by Expense Category — Jun 2026 <span class="bud-badge">Budget: FY27 BoD Approved</span></div>
-  <div style="overflow-x:auto"><table class="data-table" id="expTable">
-    <thead id="expHead"></thead>
-    <tbody id="expBody"><tr><td class="label-col" colspan="13" style="color:#9ba3af;padding:20px">Loading…</td></tr></tbody>
-  </table></div>
-</div>
-</div>
-
-<!-- 9. P&L BY DEPARTMENT -->
-<div id="tab-dept" class="tab-panel">
-<div class="table-card">
-  <div class="table-title">P&amp;L by Department — Jun 2026 <span class="bud-badge">Budget: FY27 BoD Approved</span></div>
-  <div style="overflow-x:auto"><table class="data-table" id="deptTable">
-    <thead id="deptHead"></thead>
-    <tbody id="deptBody"><tr><td class="label-col" colspan="13" style="color:#9ba3af;padding:20px">Loading…</td></tr></tbody>
-  </table></div>
-</div>
-</div>
-
-<!-- 10. HEADCOUNT -->
-<div id="tab-hc" class="tab-panel">
-<div class="charts-row">
-  <div class="chart-card"><div class="chart-title">Headcount Bridge — Jun 2026</div><canvas id="hcBridgeChart" height="140"></canvas></div>
-  <div class="chart-card"><div class="chart-title">Headcount by Department — Jun 2026</div><canvas id="hcDeptChart" height="140"></canvas></div>
-</div>
-<div class="table-card">
-  <div class="table-title">Headcount Overview — Jun 2026 <span class="bud-badge">Budget: FY27 BoD Approved</span></div>
-  <div style="overflow-x:auto"><table class="data-table">
-    <thead id="hcHead"></thead>
-    <tbody id="hcBody"><tr><td class="label-col" colspan="6" style="color:#9ba3af;padding:20px">Loading…</td></tr></tbody>
-  </table></div>
-</div>
-</div>
-
-<!-- 11. Q1 SUMMARY -->
-<div id="tab-qs" class="tab-panel">
-<div style="padding:20px 0;">
-<div class="slide-frame">
-  <div class="sl-header">
-    <div><h1>FY&#8217;27 <span>YTD</span> Financial Performance</h1></div>
-    <div class="sl-period"><strong>FY&#8217;27 &nbsp;·&nbsp; YTD Feb &ndash; Jun 2026</strong>Amounts in $K</div>
+  <div class="tab-nav">
+    <button class="tab-btn active" id="tabBtn-sales" onclick="showTab('sales')">Sales Performance</button>
+    <button class="tab-btn" id="tabBtn-health" onclick="showTab('health')">Customer Health</button>
   </div>
-  <div class="sl-body">
-    <div class="sl-left" id="qsLeft"><p style="color:#9ba3af;font-size:12px;padding:16px">Loading…</p></div>
-    <div class="sl-right">
-      <table class="sl-tbl">
-        <thead><tr>
-          <th class="th-lbl">($K)</th>
-          <th class="th-bud">Budget<br><span style="font-weight:400;font-size:9px">YTD FY27</span></th>
-          <th class="th-act">Actuals<br><span style="font-weight:400;font-size:9px">YTD FY27</span></th>
-          <th class="th-var">Var $<br><span style="font-weight:400;font-size:9px">Act – Bud</span></th>
-          <th class="th-var">Var %<br><span style="font-weight:400;font-size:9px">or pp</span></th>
-        </tr></thead>
-        <tbody id="qsBody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-</div>
+  <div class="live-badge"><span class="live-dot"></span> Live · refreshes on load</div>
 </div>
 
-<!-- 12. CUSTOMER ARR -->
-<div id="tab-custarr" class="tab-panel">
-  <div class="custarr-summary" id="custArrSummary">
-    <div class="custarr-stat"><div class="cs-label">Total Customers</div><div class="cs-value" id="cs-total">—</div><div class="cs-sub">active ARR</div></div>
-    <div class="custarr-stat"><div class="cs-label">Total ARR</div><div class="cs-value" id="cs-arr">—</div><div class="cs-sub">current month</div></div>
-    <div class="custarr-stat"><div class="cs-label">Subscription</div><div class="cs-value" id="cs-sub">—</div><div class="cs-sub">customers</div></div>
-    <div class="custarr-stat"><div class="cs-label">Consumption</div><div class="cs-value" id="cs-con">—</div><div class="cs-sub">customers</div></div>
+<div class="content" id="content">
+
+<div class="tab-pane active" id="tab-sales">
+  <div id="cardsRow" class="cards-row"></div>
+
+  <div class="section-title">Weekly pipeline changes <span class="hint">Auto-generated Friday mornings, week over week</span></div>
+  <div class="table-card" id="weeklySummaryCard" style="padding:16px 18px;">
+    <!-- WEEKLY_SUMMARY_START -->
+    <p style="font-weight:700; margin-bottom:8px;">Week of July 27, 2026</p>
+    <p class="lbl-sub" style="font-weight:700; margin-top:10px;">Closed Won this week, was Stage 3+ (1)</p>
+    <ul style="margin:4px 0 10px 20px;">
+      <li>Vail Resorts — $345K — Kevin Farley</li>
+    </ul>
+    <p class="lbl-sub" style="font-weight:700; margin-top:10px;">Closed Lost this week, was Stage 2+ (0)</p>
+    <ul style="margin:4px 0 10px 20px;"><li>None this week</li></ul>
+    <p class="lbl-sub" style="font-weight:700; margin-top:10px;">Moved out of the current quarter (2)</p>
+    <ul style="margin:4px 0 10px 20px;">
+      <li>Retail Zoo Pty Ltd — $80K — Rian Smith (now 2027 Q3)</li>
+      <li>Stellantis N.V. North America — $68K — Meg Mori (now 2027 Q3)</li>
+    </ul>
+    <p class="lbl-sub" style="font-weight:700; margin-top:10px;">Stage 3 → Stage 4 (0)</p>
+    <ul style="margin:4px 0 10px 20px;"><li>None this week</li></ul>
+    <p class="lbl-sub" style="font-weight:700; margin-top:10px;">Stage 4 → Stage 5 (0)</p>
+    <ul style="margin:4px 0 10px 20px;"><li>None this week</li></ul>
+    <!-- WEEKLY_SUMMARY_END -->
   </div>
-  <div class="custarr-row">
-    <div class="custarr-pie-card">
-      <div class="pie-title">ARR by Vertical</div>
-      <canvas id="vertPieChart" height="130"></canvas>
-    </div>
-  </div>
-  <div class="table-card">
-    <div class="table-title" style="justify-content:flex-start;gap:16px;flex-wrap:wrap;">
-      Customer ARR — Jun 2026
-      <div class="custarr-controls" style="margin-bottom:0">
-        <input type="text" id="custSearch" placeholder="Search customers…" oninput="filterCustTable()">
-        <label>Type: <select id="custTypeFilter" onchange="filterCustTable()">
-          <option value="">All</option>
-          <option value="Subscription">Subscription</option>
-          <option value="Consumption">Consumption</option>
-        </select></label>
-        <label>Vertical: <select id="custVertFilter" onchange="filterCustTable()">
-          <option value="">All</option>
-        </select></label>
-      </div>
-    </div>
-    <div style="overflow-x:auto;max-height:620px;overflow-y:auto;">
-      <table class="custarr-table" id="custArrTable">
-        <thead>
-          <tr>
-            <th onclick="sortCustTable(0)" id="cth0">Customer</th>
-            <th onclick="sortCustTable(1)" id="cth1" style="text-align:left">Vertical</th>
-            <th onclick="sortCustTable(2)" id="cth2">ARR</th>
-            <th onclick="sortCustTable(3)" id="cth3" style="text-align:center">Type</th>
-            <th onclick="sortCustTable(4)" id="cth4">Contract End</th>
-            <th onclick="sortCustTable(5)" id="cth5" title="Protect score">P</th>
-            <th onclick="sortCustTable(6)" id="cth6" title="Adopt score">A</th>
-            <th onclick="sortCustTable(7)" id="cth7" title="Momentum score">M</th>
-            <th onclick="sortCustTable(8)" id="cth8" title="Expand score">E</th>
-            <th onclick="sortCustTable(9)" id="cth9">Overall</th>
-          </tr>
-        </thead>
-        <tbody id="custArrBody"><tr><td colspan="10" style="color:#9ba3af;padding:20px">Loading…</td></tr></tbody>
-      </table>
-    </div>
-    <div class="custarr-count" id="custArrCount" style="padding:8px 12px;"></div>
-  </div>
+
+  <div class="section-title">Pipeline coverage by quarter <span class="hint">Stage 1+ open pipe vs. AE quota, by close-quarter</span></div>
+  <div class="chart-card"><canvas id="coverageChart"></canvas></div>
+  <div class="table-card"><table id="coverageTable"></table></div>
+
+  <div class="section-title">Rep productivity <span class="hint">Open pipe by stage, closed FYTD, coverage vs. remaining quota</span></div>
+  <div class="table-card" style="overflow-x:auto"><table id="repTable"></table></div>
 </div>
 
-</div><!-- /content -->
+<div class="tab-pane" id="tab-health">
+  <div class="custarr-summary">
+    <div class="custarr-stat"><div class="cs-label">Total Customers</div><div class="cs-value" id="ch-total">—</div><div class="cs-sub">active ARR</div></div>
+    <div class="custarr-stat"><div class="cs-label">Total ARR</div><div class="cs-value" id="ch-arr">—</div><div class="cs-sub">current</div></div>
+    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-red"></span>Red</div><div class="cs-value" id="ch-red">—</div><div class="cs-sub">Pulse 1–2</div></div>
+    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-yellow"></span>Yellow</div><div class="cs-value" id="ch-yellow">—</div><div class="cs-sub">Pulse 3</div></div>
+    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-green"></span>Green</div><div class="cs-value" id="ch-green">—</div><div class="cs-sub">Pulse 4–5</div></div>
+  </div>
+
+  <div class="section-title">Customer health — weekly summary <span class="hint">Auto-generated Monday mornings · Pulse (CSM) changes and usage movers, week over week</span></div>
+  <div class="table-card" id="healthSummaryCard" style="padding:16px 18px;">
+    <!-- HEALTH_SUMMARY_START -->
+    <p style="font-weight:700; margin-bottom:8px;">Week of July 27, 2026</p>
+    <p class="lbl-sub" style="font-weight:700; margin-top:10px;">Pulse (CSM) changes</p>
+    <ul style="margin:4px 0 10px 20px;">
+      <li>Emirates Group — "3 - Stable (Passive)" → "4 - Secure (Satisfied)" (Yellow → Green) — largest usage swing: Sources/bridge, -30,972 amps</li>
+      <li>Alice + Olivia LLC — "2 - At-Risk (Detractor)" → "3 - Stable (Passive)" (Red → Yellow) — largest usage swing: Analytics/predictive, +1,327 amps</li>
+    </ul>
+    <p class="lbl-sub" style="font-weight:700; margin-top:10px;">Usage — Top 5 increases</p>
+    <ul style="margin:4px 0 10px 20px;">
+      <li>The Gap, Inc. — 322,123 amps/day, +67,158 (+26%) — largest usage swing: Activation/campaigns, +294,636 amps</li>
+      <li>Nordstrom, Inc. — 242,433 amps/day, +14,408 (+6%) — largest usage swing: Stitch/stitch, +61,151 amps</li>
+      <li>Endeavour Group Limited — 54,385 amps/day, +10,676 (+24%) — largest usage swing: Analytics/segments, +52,038 amps</li>
+      <li>Loblaws Inc. — 81,556 amps/day, +9,757 (+14%) — largest usage swing: Stitch/stitch, +27,050 amps</li>
+      <li>Macy's, Inc. — 135,564 amps/day, +6,068 (+5%) — largest usage swing: Databases/database, +24,653 amps</li>
+    </ul>
+    <p class="lbl-sub" style="font-weight:700; margin-top:10px;">Usage — Bottom 5 decreases</p>
+    <ul style="margin:4px 0 10px 20px;">
+      <li>Dick's Sporting Goods — 149,124 amps/day, -16,669 (-10%) — largest usage swing: Databases/database, -120,433 amps</li>
+      <li>L. L. Bean, Inc. — 24,046 amps/day, -12,410 (-34%) — largest usage swing: Activation/campaigns, -62,766 amps</li>
+      <li>Coles Group Limited — 18,112 amps/day, -7,343 (-29%) — largest usage swing: Analytics/segments, -17,938 amps</li>
+      <li>Haymarket Media Group Limited — 37,303 amps/day, -4,803 (-11%) — largest usage swing: Activation/campaigns, -17,037 amps</li>
+      <li>Emirates Group — 6,699 amps/day, -4,473 (-40%) — largest usage swing: Sources/bridge, -30,972 amps</li>
+    </ul>
+    <!-- HEALTH_SUMMARY_END -->
+  </div>
+
+  <div class="section-title">Customer health <span class="hint">ARR base from Salesforce · Relationship Health Pulse (CSM) · Last 7-day AMPs usage vs. trailing 4-week average</span></div>
+  <div class="custarr-controls">
+    <input type="text" id="chSearch" placeholder="Search customers…" oninput="filterHealthTable()">
+    <label>Type: <select id="chTypeFilter" onchange="filterHealthTable()">
+      <option value="">All</option><option value="Subscription">Subscription</option><option value="Consumption">Consumption</option>
+    </select></label>
+    <label>Health: <select id="chHealthFilter" onchange="filterHealthTable()">
+      <option value="">All</option><option value="red">Red</option><option value="yellow">Yellow</option><option value="green">Green</option>
+    </select></label>
+  </div>
+  <div class="table-card" style="overflow-x:auto; max-height:640px; overflow-y:auto;">
+    <table class="custarr-table" id="healthTable"></table>
+  </div>
+  <div class="custarr-count" id="ch-count"></div>
+</div>
+
+</div>
 
 <script>
-// ─── BRAND & CONSTANTS ────────────────────────────────
-const BRAND = { black:'#0C0C0C', lime:'#E9FF5F', teal:'#80C7D1', paleTeal:'#CAEFEF', coral:'#FF9988' };
+// ─── CONSTANTS ────────────────────────────────────────
+const BRAND = { black:'#0C0C0C', lime:'#E9FF5F', teal:'#80C7D1', paleTeal:'#CAEFEF', coral:'#FF9988', good:'#15803d', warn:'#b45309', bad:'#b91c1c' };
 
-// Name aliases: maps actuals names → target names when they differ
+// Name mismatches between Salesforce pipeline (OWNER_NAME/RVP_NAME) and the
+// finance quota table (mrp_sales_targets.NAME) — kept in sync with the
+// monthly reporting dashboard's alias map.
 const NAME_ALIAS = {
   'Christopher Hemmings': 'Chris Hemmings',
   'Robert Pope': 'Rob Pope',
   'Jeff Dome': 'Jeffrey Dome',
-};
-const C_ACT = BRAND.teal, C_BUD = BRAND.paleTeal, C_INC = '#16a34a', C_DEC = '#dc2626';
-
-const CURRENT = '2026-06-30', PREV = '2026-05-31', BOP_DT = '2026-01-31';
-const QTD = ['2026-05-31','2026-06-30'];
-const YTD = ['2026-02-28','2026-03-31','2026-04-30','2026-05-31','2026-06-30'];
-const YTD_TGT = ['2026-02-28','2026-03-31','2026-04-30','2026-05-31','2026-06-30','2026-07-31'];
-const TTM = ['2025-07-31','2025-08-31','2025-09-30',
-             '2025-10-31','2025-11-30','2025-12-31','2026-01-31','2026-02-28','2026-03-31','2026-04-30','2026-05-31','2026-06-30'];
-const TTM_LBL = ['Jul-25','Aug-25','Sep-25','Oct-25','Nov-25','Dec-25','Jan-26','Feb-26','Mar-26','Apr-26','May-26','Jun-26'];
-
-// ─── TAB SWITCH ──────────────────────────────────────
-function switchTab(id, btn) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-'+id).classList.add('active');
-  btn.classList.add('active');
-}
-
-// ─── FORMAT HELPERS ──────────────────────────────────
-const N  = (v,d=0) => { if(v==null||v==='')return '—'; const n=+v; if(isNaN(n))return '—'; return n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); };
-const K  = (v,d=0) => { if(v==null||v==='')return '—'; const n=+v; if(isNaN(n))return '—'; return N(Math.round(n),d); };
-const KD = (v,d=0) => { if(v==null||v==='')return '—'; const n=+v; if(isNaN(n))return '—'; return '$'+N(Math.round(n),d); };
-const PCT= (v,d=1) => { if(v==null)return '—'; const n=+v; if(isNaN(n))return '—'; return (n*100).toFixed(d)+'%'; };
-const PP = (v,d=1) => { if(v==null)return '—'; const n=+v; if(isNaN(n))return '—'; return (n>=0?'+':'')+n.toFixed(d)+'pp'; };
-// Signed $ variance (in $K)
-const varK = (a,b) => { if(a==null||b==null)return '—'; const v=(+a-+b)/1e3; return (v>=0?'+':'')+N(Math.round(v)); };
-// % variance of absolute amounts: (a-b)/|b| — positive = above plan
-const varPct = (a,b) => { if(!b||b==null)return '—'; const v=(+a-+b)/Math.abs(+b); return (v>=0?'+':'-')+(Math.abs(v)*100).toFixed(1)+'%'; };
-// PP variance between two rates (already as decimals)
-const varPP = (a,b) => { if(a==null||b==null)return '—'; return PP((+a)-(+b)); };
-// Variance CSS class: dir=1 means bigger actual is good (revenue), dir=-1 means smaller is good (expense)
-const vc = (a,b,dir=1) => {
-  if(a==null||b==null)return 'var-flat';
-  const diff=(+a)-(+b);
-  if(Math.abs(diff)<0.0001*Math.abs(+b||1))return 'var-flat';
-  return diff*dir>0?'var-good':'var-bad';
+  'David Newman': 'Dave Newman',
 };
 
-// ─── 9-COLUMN TABLE HEAD ─────────────────────────────
-function makeHead9(labelW='200px') {
-  return `<tr class="group-header">
-    <th class="label-col hdr-m" style="width:${labelW};font-size:9px;color:#9ba3af;text-transform:none;letter-spacing:0;font-weight:400">$K</th>
-    <th colspan="3" class="hdr-m">Month (Jun)</th>
-    <th class="hdr-spacer"></th>
-    <th colspan="3" class="hdr-q">QTD (May–Jun)</th>
-    <th class="hdr-spacer"></th>
-    <th colspan="3" class="hdr-y">YTD (Feb–Jun)</th>
-  </tr>
-  <tr class="col-header">
-    <th class="label-col"></th>
-    <th class="col-m">Actuals</th><th class="col-mb">Budget</th><th class="col-mv">vs Bud</th>
-    <th class="hdr-spacer"></th>
-    <th class="col-q divider-left">Actuals</th><th class="col-qb">Budget</th><th class="col-qv">vs Bud</th>
-    <th class="hdr-spacer"></th>
-    <th class="col-y divider-left">Actuals</th><th class="col-yb">Budget</th><th class="col-yv">vs Bud</th>
-  </tr>`;
-}
+// Reps to drop from every view (e.g. no longer with the company / placeholder rows).
+const EXCLUDED_REPS = new Set(['Kevin Kovacevich']);
 
-// ─── ROW BUILDERS ────────────────────────────────────
-// row9: $ amounts, variance as % or $K
-function row9(label, mA, mB, qA, qB, yA, yB, opts={}) {
-  const { cls='', lc='label-col', varDir=1, varFmt='pct', fmtFn=K } = opts;
-  const vf = varFmt==='pp'
-    ? (a,b) => varPP(a,b)
-    : (a,b) => varPct(a,b);
-  return `<tr class="${cls}">
-    <td class="${lc}">${label}</td>
-    <td class="col-m">${fmtFn(mA)}</td>
-    <td class="col-mb">${fmtFn(mB)}</td>
-    <td class="col-mv ${vc(mA,mB,varDir)}">${vf(mA,mB)}</td>
-    <td></td>
-    <td class="col-q divider-left">${fmtFn(qA)}</td>
-    <td class="col-qb">${fmtFn(qB)}</td>
-    <td class="col-qv ${vc(qA,qB,varDir)}">${vf(qA,qB)}</td>
-    <td></td>
-    <td class="col-y divider-left">${fmtFn(yA)}</td>
-    <td class="col-yb">${fmtFn(yB)}</td>
-    <td class="col-yv ${vc(yA,yB,varDir)}">${vf(yA,yB)}</td>
-  </tr>`;
-}
-// rowPct: metric is already a rate (%), variance shown as pp
-function rowPct(label, mA_pct, mB_pct, qA_pct, qB_pct, yA_pct, yB_pct, opts={}) {
-  const { cls='', lc='label-col', varDir=1 } = opts;
-  const f = v => v==null?'—':PCT(v);
-  const vf = (a,b) => a==null||b==null?'—': PP((+a-+b)*100);
-  return `<tr class="${cls}">
-    <td class="${lc}">${label}</td>
-    <td class="col-m">${f(mA_pct)}</td>
-    <td class="col-mb">${f(mB_pct)}</td>
-    <td class="col-mv ${vc(mA_pct,mB_pct,varDir)}">${vf(mA_pct,mB_pct)}</td>
-    <td></td>
-    <td class="col-q divider-left">${f(qA_pct)}</td>
-    <td class="col-qb">${f(qB_pct)}</td>
-    <td class="col-qv ${vc(qA_pct,qB_pct,varDir)}">${vf(qA_pct,qB_pct)}</td>
-    <td></td>
-    <td class="col-y divider-left">${f(yA_pct)}</td>
-    <td class="col-yb">${f(yB_pct)}</td>
-    <td class="col-yv ${vc(yA_pct,yB_pct,varDir)}">${vf(yA_pct,yB_pct)}</td>
-  </tr>`;
-}
-function secRow(label, cols=13) { return `<tr class="row-section"><td class="label-col" colspan="${cols}">${label}</td></tr>`; }
-function spacer(cols=13) { return `<tr class="row-spacer"><td colspan="${cols}"></td></tr>`; }
+// CLOSE_FISCAL_PERIOD values are labeled '2027 Qn' for FY27 (Feb 2026–Jan 2027) —
+// same offset-by-one convention Snowflake uses elsewhere in this workspace.
+const CURRENT_FY_PREFIX = '2027 ';
+function isCurrentFY(d){ return !!d.fq && d.fq.startsWith(CURRENT_FY_PREFIX); }
 
-// ─── SQL EXECUTION ───────────────────────────────────
+const LATE_STAGES = new Set(['Stage 4 – Proposal & Plan', 'Stage 4 – Selection', 'Stage 5 – Negotiation']);
+
+// FY27 = Feb 2026 – Jan 2027. Closed-actuals months load through the last closed
+// month (June); the current open quarter is Q2 (May/Jun/Jul).
+const FYTD_MONTHS = ['2026-02-28','2026-03-31','2026-04-30','2026-05-31','2026-06-30'];
+const QUARTERS = [
+  { label: 'Q2 FY27 (current)', fq: '2027 Q2', months: ['2026-05-01','2026-06-01','2026-07-01'] },
+  { label: 'Q3 FY27',            fq: '2027 Q3', months: ['2026-08-01','2026-09-01','2026-10-01'] },
+  { label: 'Q4 FY27',            fq: '2027 Q4', months: ['2026-11-01','2026-12-01','2027-01-01'] },
+];
+const FULL_YEAR_MONTHS = ['2026-02-01','2026-03-01','2026-04-01','2026-05-01','2026-06-01','2026-07-01','2026-08-01','2026-09-01','2026-10-01','2026-11-01','2026-12-01','2027-01-01'];
+
+// ─── FORMATTERS ───────────────────────────────────────
+function N(v){ if(v==null||isNaN(v))return '—'; return Math.round(v).toLocaleString('en-US'); }
+function K(v){ if(v==null||isNaN(v))return '—'; const n=v/1000; return (n<0?'-$':'$')+Math.round(Math.abs(n)).toLocaleString('en-US')+'K'; }
+function PCT(v,d=0){ if(v==null||isNaN(v))return '—'; return (v*100).toFixed(d)+'%'; }
+function covClass(cov){ if(cov==null) return ''; if(cov>=3) return 'cov-good'; if(cov>=1.5) return 'cov-warn'; return 'cov-bad'; }
+function alias(n){ return NAME_ALIAS[n] || n; }
+
+// ─── SQL EXECUTION (same dual-mode pattern as the monthly dashboard) ──
 const USE_COWORK = () => !!window.cowork?.callMcpTool;
-
-// Shared-secret sent to /api/sql — must match the DASHBOARD_API_KEY env var set in
-// Vercel. This is a deterrent, not real authentication: it lives in this page's source,
-// so anyone who views source can extract it. Raises the bar above a fully open proxy;
-// for real access control use Vercel Deployment Protection (password/SSO) at the project level.
 const DASHBOARD_API_KEY = '81230abdf96a7de1dfe84165d28fea3c821b3318ad15d4be';
 
 async function execSQL(sql) {
-  // Standalone / Vercel mode
   if (!USE_COWORK()) {
     const res = await fetch('/api/sql', {
       method: 'POST',
@@ -572,7 +282,6 @@ async function execSQL(sql) {
     if (!res.ok) throw new Error('SQL error: ' + (await res.text()).slice(0, 200));
     return res.json();
   }
-  // Cowork mode
   const raw = await window.cowork.callMcpTool('mcp__2c211ab0-a702-4355-9d71-4acf3f0ad8d5__sql_exec_tool', { sql });
   let jsonStr;
   if (typeof raw === 'string') jsonStr = raw;
@@ -588,104 +297,29 @@ async function execSQL(sql) {
   return rs.data.map(row => { const o={}; cols.forEach((c,i)=>{ o[c]=row[i]; }); return o; });
 }
 
-// ─── QUERIES ─────────────────────────────────────────
+// ─── QUERIES ──────────────────────────────────────────
 const Q = {
-  financials: `
-    SELECT MONTH_END_DT, ACCOUNT_TYPE,
-           COALESCE(C_REVENUE,'') as C_REVENUE,
-           COALESCE(C_PARENT_DEPT,'') as C_PARENT_DEPT,
-           COALESCE(C_PL_CLASS,'') as C_PL_CLASS,
-           COALESCE(C_EXPENSE_CATEGORY,'') as C_EXPENSE_CATEGORY,
-           SUM(AMT) as AMT
-    FROM load.finance_sandbox.mrp_financials
-    WHERE MONTH_END_DT BETWEEN '2025-07-31' AND '2026-06-30'
-      AND C_PL_INCLUDE = TRUE
-    GROUP BY MONTH_END_DT,ACCOUNT_TYPE,C_REVENUE,C_PARENT_DEPT,C_PL_CLASS,C_EXPENSE_CATEGORY
-    ORDER BY MONTH_END_DT,ACCOUNT_TYPE`,
+  // All open, non-SQL-stage pipeline with per-deal detail — powers rep productivity,
+  // quarter coverage, and the late-stage deal list from a single round trip.
+  pipeline: `
+    SELECT OPPORTUNITY_NAME, ACCOUNT_NAME, OWNER_NAME, RVP_NAME, STAGE_NAME,
+           ARR, CLOSE_DT, CLOSE_FISCAL_PERIOD
+    FROM PROD.GTM.SALES_PIPELINE
+    WHERE STATE = 'Open'
+      AND TYPE IN ('Upsell','Full License')
+      AND STAGE_NAME IN (
+        'Stage 1 - Discovery','Stage 2 - Solution Identification','Stage 3 - Validation',
+        'Stage 4 – Proposal & Plan','Stage 4 – Selection','Stage 5 – Negotiation'
+      )
+    ORDER BY ARR DESC`,
 
-  budget: `
-    SELECT TIME_MONTH_END,
-           COALESCE(C_REVENUE,'') as C_REVENUE,
-           COALESCE(C_PARENT_DEPT,'') as C_PARENT_DEPT,
-           COALESCE(C_PL_CLASS,'') as C_PL_CLASS,
-           COALESCE(C_EXPENSE_CATEGORY,'') as C_EXPENSE_CATEGORY,
-           SUM(VALUE) as BUDGET
-    FROM load.finance_sandbox.mrp_forecast
-    WHERE VERSION_NAME = '2026.3.6 - FY27 Final BoD Approved'
-      AND C_PL_INCLUDE = 1
-      AND (C_REVENUE IS NOT NULL AND C_REVENUE != ''
-           OR C_PARENT_DEPT IS NOT NULL AND C_PARENT_DEPT != '')
-    GROUP BY TIME_MONTH_END,C_REVENUE,C_PARENT_DEPT,C_PL_CLASS,C_EXPENSE_CATEGORY
-    HAVING TIME_MONTH_END IN (
-      TO_DATE('2026-02-28','YYYY-MM-DD'),
-      TO_DATE('2026-03-31','YYYY-MM-DD'),
-      TO_DATE('2026-04-30','YYYY-MM-DD'),
-      TO_DATE('2026-05-31','YYYY-MM-DD'),
-      TO_DATE('2026-06-30','YYYY-MM-DD')
-    )
-    ORDER BY TIME_MONTH_END`,
-
-  arr: `
-    SELECT MONTH_END_DT,
-           SUM(C_ARR) as C_ARR, SUM(NEW_ARR) as NEW_ARR,
-           SUM(EXPANSION_ARR) as EXP_ARR, SUM(CHURN_ARR) as CHURN_ARR,
-           SUM(UP_FOR_RENEWAL_ARR) as UP_RENEWAL, SUM(RENEWED_ARR) as RENEWED_ARR
-    FROM prod.dealsbase.customer_month
-    WHERE MONTH_END_DT BETWEEN '2026-01-31' AND '2026-06-30'
-    GROUP BY MONTH_END_DT ORDER BY MONTH_END_DT`,
-
-  cash: `
-    SELECT MONTH_END_DATE, SUM(ENDING_BALANCE) as CASH
-    FROM load.finance_sandbox.mrp_cash
-    WHERE MONTH_END_DATE BETWEEN '2026-01-31' AND '2026-06-30'
-      AND ACCOUNT_CATEGORY='Cash'
-    GROUP BY MONTH_END_DATE ORDER BY MONTH_END_DATE`,
-
-  billings: `
-    SELECT INVOICED_ACCOUNTING_PERIOD as PERIOD, SUM(INVOICE_AMOUNT_USD) as AMOUNT
-    FROM load.finance_sandbox.mrp_billings_collections
-    WHERE INVOICED_ACCOUNTING_PERIOD BETWEEN '2026-02-28' AND '2026-06-30'
-    GROUP BY PERIOD ORDER BY PERIOD`,
-
-  collections: `
-    SELECT COLLECTED_ACCOUNTING_PERIOD as PERIOD, SUM(COLLECTION_AMOUNT_USD) as AMOUNT
-    FROM load.finance_sandbox.mrp_billings_collections
-    WHERE COLLECTED_ACCOUNTING_PERIOD BETWEEN '2026-02-28' AND '2026-06-30'
-    GROUP BY PERIOD ORDER BY PERIOD`,
-
-  sales: `
-    SELECT CLOSE_MONTH, OPPORTUNITY_OWNER,
-           COALESCE(ACCOUNT_RVP,'') as ACCOUNT_RVP,
+  closedFYTD: `
+    SELECT CLOSE_MONTH, OPPORTUNITY_OWNER, COALESCE(ACCOUNT_RVP,'') as ACCOUNT_RVP,
            SUM(CLOSED_ARR) as CLOSED_ARR
     FROM load.finance_sandbox.mrp_sales_effect
     WHERE CLOSE_MONTH BETWEEN '2026-02-28' AND '2026-06-30'
-      AND REP_TYPE='AE'
-    GROUP BY CLOSE_MONTH,OPPORTUNITY_OWNER,ACCOUNT_RVP
-    ORDER BY ACCOUNT_RVP,OPPORTUNITY_OWNER,CLOSE_MONTH`,
-
-  headcount: `
-    SELECT COALESCE(C_PARENT_DEPT,'Unassigned') as DEPT, EMPLOYEE_TYPE,
-           SUM("2026-01-31") as HC_JAN, SUM("2026-02-28") as HC_FEB,
-           SUM("2026-03-31") as HC_MAR, SUM("2026-04-30") as HC_APR,
-           SUM("2026-05-31") as HC_MAY, SUM("2026-06-30") as HC_JUN
-    FROM load.finance_sandbox.mrp_employee_snap
-    WHERE C_PARENT_DEPT IS NOT NULL AND C_PARENT_DEPT != ''
-      AND EMPLOYEE_TYPE != 'Intern'
-    GROUP BY C_PARENT_DEPT,EMPLOYEE_TYPE ORDER BY DEPT,EMPLOYEE_TYPE`,
-
-  hcBridge: `
-    SELECT 'Hire' as EVT, COALESCE(C_PARENT_DEPT,'') as DEPT, COUNT(*) as CNT
-    FROM load.finance_sandbox.mrp_employee_snap
-    WHERE START_DT BETWEEN '2026-06-01' AND '2026-06-30'
-      AND EMPLOYEE_TYPE != 'Intern'
-    GROUP BY C_PARENT_DEPT
-    UNION ALL
-    SELECT TERMINATED_REASON, COALESCE(C_PARENT_DEPT,''), COUNT(*)
-    FROM load.finance_sandbox.mrp_employee_snap
-    WHERE DEPARTURE_DT BETWEEN '2026-06-01' AND '2026-06-30'
-      AND TERMINATED_REASON IS NOT NULL AND TERMINATED_REASON!=''
-      AND EMPLOYEE_TYPE != 'Intern'
-    GROUP BY TERMINATED_REASON,C_PARENT_DEPT`,
+      AND REP_TYPE = 'AE'
+    GROUP BY CLOSE_MONTH, OPPORTUNITY_OWNER, ACCOUNT_RVP`,
 
   salesTargets: `
     SELECT ROLE_TYPE, NAME, MANAGER_NAME, MONTH_START, SUM(MONTHLY_QUOTA_FROM_PRORATED) as TARGET
@@ -693,22 +327,29 @@ const Q = {
     WHERE MONTH_START IN ('2026-02-01','2026-03-01','2026-04-01','2026-05-01','2026-06-01','2026-07-01','2026-08-01','2026-09-01','2026-10-01','2026-11-01','2026-12-01','2027-01-01')
       AND ROLE_TYPE IN ('AE','RVP')
       AND (IS_ACTIVE = TRUE OR IS_ACTIVE IS NULL)
-    GROUP BY ROLE_TYPE, NAME, MANAGER_NAME, MONTH_START
-    ORDER BY ROLE_TYPE, NAME, MONTH_START`,
+    GROUP BY ROLE_TYPE, NAME, MANAGER_NAME, MONTH_START`,
 
-  customerArr: `
+  // Customer Health: same base as the monthly dashboard's Customer ARR tab
+  // (PROD.DEALSBASE.CUSTOMER_ACCOUNT_MAP joined to PROD.SALESFORCE.ACCOUNTS),
+  // plus: Relationship Health Pulse (CSM) from the raw Salesforce Account object
+  // (not yet mirrored into the cleaned PROD.SALESFORCE.ACCOUNTS table), contract
+  // start date, and a last-7-day vs. trailing-4-week AMPs usage comparison from
+  // PROD.FISHBOWL.AMPS.
+  customerHealth: `
     WITH sf_customers AS (
       SELECT
         cam.CUSTOMER_ID,
         cam.CUSTOMER_NAME,
+        cam.ACCOUNT_ID,
         SUM(a.ARR) AS ARR,
         TO_CHAR(MAX(a.CONTRACT_END_DT), 'YYYY-MM-DD') AS CONTRACT_END_DT,
+        TO_CHAR(MIN(a.CONTRACT_START_DT), 'YYYY-MM-DD') AS CONTRACT_START_DT,
         CASE WHEN MAX(CASE WHEN a.CONSUMPTION_TYPE IS NOT NULL AND a.CONSUMPTION_TYPE != '' THEN 1 ELSE 0 END) = 1
           THEN 'Consumption' ELSE 'Subscription' END AS CONTRACT_TYPE
       FROM PROD.DEALSBASE.CUSTOMER_ACCOUNT_MAP cam
       JOIN PROD.SALESFORCE.ACCOUNTS a ON cam.ACCOUNT_ID = a.ACCOUNT_ID
       WHERE a.TYPE = 'Customer' AND a.ARR > 0
-      GROUP BY cam.CUSTOMER_ID, cam.CUSTOMER_NAME
+      GROUP BY cam.CUSTOMER_ID, cam.CUSTOMER_NAME, cam.ACCOUNT_ID
     ),
     sf_vertical AS (
       SELECT cam.CUSTOMER_ID, a.VERTICAL, COUNT(*) AS cnt
@@ -718,928 +359,116 @@ const Q = {
       GROUP BY cam.CUSTOMER_ID, a.VERTICAL
       QUALIFY ROW_NUMBER() OVER (PARTITION BY cam.CUSTOMER_ID ORDER BY cnt DESC) = 1
     ),
-    ah_latest AS (
-      SELECT ACCOUNT_ID, P_SCORE, A_SCORE, M_SCORE, E_SCORE, OVERALL_SCORE, HEALTH_COLOR
-      FROM prod.account360.account_health
-      QUALIFY ROW_NUMBER() OVER (PARTITION BY ACCOUNT_ID ORDER BY CALC_DT DESC) = 1
+    pulse AS (
+      SELECT ID AS ACCOUNT_ID, RELATIONSHIP_HEALTH_PULSE_CSM_C AS PULSE
+      FROM LOAD.SALESFORCE_RAW.ACCOUNT
     ),
-    sf_health AS (
-      SELECT
-        cam.CUSTOMER_ID,
-        AVG(ah.P_SCORE)       AS P_SCORE,
-        AVG(ah.A_SCORE)       AS A_SCORE,
-        AVG(ah.M_SCORE)       AS M_SCORE,
-        AVG(ah.E_SCORE)       AS E_SCORE,
-        AVG(ah.OVERALL_SCORE) AS OVERALL_SCORE,
-        MIN(CASE ah.HEALTH_COLOR WHEN 'red' THEN 1 WHEN 'yellow' THEN 2 WHEN 'green' THEN 3 ELSE 4 END) AS HEALTH_RANK
-      FROM PROD.DEALSBASE.CUSTOMER_ACCOUNT_MAP cam
-      JOIN ah_latest ah ON cam.ACCOUNT_ID = ah.ACCOUNT_ID
-      GROUP BY cam.CUSTOMER_ID
+    usage_agg AS (
+      SELECT SALESFORCE_ACCOUNT_ID,
+        SUM(CASE WHEN USAGE_DATE >= DATEADD(day,-7,CURRENT_DATE()) THEN AMPS_AMOUNT ELSE 0 END) / 7.0 AS CURR_7D_AVG,
+        SUM(CASE WHEN USAGE_DATE >= DATEADD(day,-28,CURRENT_DATE()) THEN AMPS_AMOUNT ELSE 0 END) / 28.0 AS AVG_4WK_AVG
+      FROM PROD.FISHBOWL.AMPS
+      WHERE USAGE_DATE >= DATEADD(day,-28,CURRENT_DATE()) AND TENANT_IS_SANDBOX = FALSE
+      GROUP BY SALESFORCE_ACCOUNT_ID
     )
     SELECT
-      c.CUSTOMER_NAME,
-      COALESCE(v.VERTICAL, '')                                              AS VERTICAL,
-      c.ARR,
-      c.CONTRACT_TYPE,
-      c.CONTRACT_END_DT,
-      ROUND(h.P_SCORE, 1)       AS P_SCORE,
-      ROUND(h.A_SCORE, 1)       AS A_SCORE,
-      ROUND(h.M_SCORE, 1)       AS M_SCORE,
-      ROUND(h.E_SCORE, 1)       AS E_SCORE,
-      ROUND(h.OVERALL_SCORE, 1) AS OVERALL_SCORE,
-      CASE h.HEALTH_RANK WHEN 1 THEN 'red' WHEN 2 THEN 'yellow' WHEN 3 THEN 'green' ELSE '' END AS HEALTH_COLOR
+      c.CUSTOMER_NAME, c.ARR, c.CONTRACT_TYPE, c.CONTRACT_START_DT, c.CONTRACT_END_DT,
+      COALESCE(v.VERTICAL, '') AS VERTICAL,
+      p.PULSE, u.CURR_7D_AVG, u.AVG_4WK_AVG
     FROM sf_customers c
     LEFT JOIN sf_vertical v ON c.CUSTOMER_ID = v.CUSTOMER_ID
-    LEFT JOIN sf_health h     ON c.CUSTOMER_ID = h.CUSTOMER_ID
+    LEFT JOIN pulse p ON c.ACCOUNT_ID = p.ACCOUNT_ID
+    LEFT JOIN usage_agg u ON c.ACCOUNT_ID = u.SALESFORCE_ACCOUNT_ID
     ORDER BY c.ARR DESC`,
-
-  kpi: `
-    SELECT TIME_MONTH_END, ACCOUNT_CODE, SUM(VALUE) as BUDGET
-    FROM load.finance_sandbox.mrp_forecast
-    WHERE VERSION_NAME = '2026.3.6 - FY27 Final BoD Approved'
-      AND ACCOUNT_CODE IN (
-        'Adjusted_CF','KPI.NewARR','KPI.ExpansionARR',
-        'KPI.Downsell_Churn','Cash_EOP','Total_HC_EOM','KPI.Exiting_ARR',
-        'Bookings.UpForRenewal','BillCollect.Collections'
-      )
-    GROUP BY TIME_MONTH_END, ACCOUNT_CODE
-    HAVING TIME_MONTH_END IN (
-      TO_DATE('2026-02-28','YYYY-MM-DD'),
-      TO_DATE('2026-03-31','YYYY-MM-DD'),
-      TO_DATE('2026-04-30','YYYY-MM-DD'),
-      TO_DATE('2026-05-31','YYYY-MM-DD'),
-      TO_DATE('2026-06-30','YYYY-MM-DD')
-    )
-    ORDER BY ACCOUNT_CODE, TIME_MONTH_END`,
-
-  hcDeptBudget: `
-    SELECT C_PARENT_DEPT, SUM(VALUE) as BUDGET
-    FROM load.finance_sandbox.mrp_forecast
-    WHERE VERSION_NAME = '2026.3.6 - FY27 Final BoD Approved'
-      AND ACCOUNT_CODE = 'Total_HC_EOM'
-      AND TIME_MONTH_END = TO_DATE('2026-06-30','YYYY-MM-DD')
-    GROUP BY C_PARENT_DEPT
-    ORDER BY C_PARENT_DEPT`,
-
-  pipeline: `
-    SELECT p.OWNER_NAME AS REP_NAME, p.RVP_NAME, SUM(p.ARR) AS PIPELINE
-    FROM PROD.GTM.SALES_PIPELINE p
-    WHERE p.STAGE_NAME IN (
-      'Stage 1 - Discovery',
-      'Stage 2 - Solution Identification',
-      'Stage 3 - Validation',
-      'Stage 4 – Proposal & Plan',
-      'Stage 4 – Selection',
-      'Stage 5 – Negotiation'
-    )
-    AND p.STATE = 'Open'
-    AND p.TYPE IN ('Upsell', 'Full License')
-    GROUP BY p.OWNER_NAME, p.RVP_NAME
-    ORDER BY p.RVP_NAME, p.OWNER_NAME`
 };
 
-// ─── DATE HELPER ─────────────────────────────────────
-// Snowflake REST API v2 returns DATE columns as integer day offsets from 1970-01-01.
-// Convert to YYYY-MM-DD. Passes through if already a date string.
-function parseDate(v) {
-  if (!v && v !== 0) return '';
-  const s = String(v);
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  const n = parseInt(s, 10);
-  if (isNaN(n)) return s;
-  return new Date(n * 86400000).toISOString().slice(0, 10);
+// ─── PRE-PROCESS ──────────────────────────────────────
+function parseDate(v){
+  if(!v && v!==0) return '';
+  const s=String(v);
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  const n=parseInt(s,10);
+  if(isNaN(n)) return s;
+  return new Date(n*86400000).toISOString().slice(0,10);
 }
 
-// ─── PRE-PROCESS ─────────────────────────────────────
-function preProcessFin(rows) {
-  const rev={}, exp={};
+function preProcessPipeline(rows){
+  const deals = rows
+    .map(r => ({
+      name: r.OPPORTUNITY_NAME, account: r.ACCOUNT_NAME,
+      owner: alias(r.OWNER_NAME), rvp: alias(r.RVP_NAME || ''),
+      stage: r.STAGE_NAME, arr: +(r.ARR||0),
+      closeDt: parseDate(r.CLOSE_DT), fq: r.CLOSE_FISCAL_PERIOD || '',
+    }))
+    .filter(d => !EXCLUDED_REPS.has(d.owner));
+  return deals;
+}
+
+function preProcessClosed(rows){
+  const reps = {};
   for (const r of rows) {
-    const dt=parseDate(r.MONTH_END_DT);
-    const amt=+(r.AMT||0);
-    if(r.ACCOUNT_TYPE==='Income') {
-      if(!rev[dt])rev[dt]={};
-      const rt=r.C_REVENUE||'Other Revenue';
-      rev[dt][rt]=(rev[dt][rt]||0)+(-amt);
-    } else {
-      if(!exp[dt])exp[dt]={};
-      const d=r.C_PARENT_DEPT||'', c=r.C_PL_CLASS||'', cat=r.C_EXPENSE_CATEGORY||'';
-      if(!exp[dt][d])exp[dt][d]={};
-      if(!exp[dt][d][c])exp[dt][d][c]={};
-      exp[dt][d][c][cat]=(exp[dt][d][c][cat]||0)+amt;
-    }
+    const rep = alias(r.OPPORTUNITY_OWNER);
+    if (EXCLUDED_REPS.has(rep)) continue;
+    const mgr = alias(r.ACCOUNT_RVP || '');
+    if (!reps[rep]) reps[rep] = { mgr, total: 0 };
+    reps[rep].total += +(r.CLOSED_ARR||0);
+    if (mgr) reps[rep].mgr = mgr;
   }
-  const revSum=(mths,type)=>mths.reduce((s,dt)=>s+((rev[dt]&&rev[dt][type])||0),0);
-  const revTotal=(mths)=>mths.reduce((s,dt)=>{if(!rev[dt])return s;return s+Object.values(rev[dt]).reduce((a,b)=>a+b,0);},0);
-  const expSum=(mths,dept,cls,cat)=>mths.reduce((s,dt)=>{
-    if(!exp[dt])return s;
-    const d=exp[dt][dept];if(!d)return s;
-    if(cls&&cat)return s+((d[cls]&&d[cls][cat])||0);
-    if(cls){if(!d[cls])return s;return s+Object.values(d[cls]).reduce((a,b)=>a+b,0);}
-    return s+Object.values(d).reduce((dv,cm)=>dv+Object.values(cm).reduce((a,b)=>a+b,0),0);
-  },0);
-  const expCatSum=(mths,cat)=>mths.reduce((s,dt)=>{
-    if(!exp[dt])return s;
-    return s+Object.values(exp[dt]).reduce((ds,cm)=>ds+Object.values(cm).reduce((cs,cats)=>cs+(cats[cat]||0),0),0);
-  },0);
-  const expDeptCatSum=(mths,dept,cat)=>mths.reduce((s,dt)=>{
-    if(!exp[dt]||!exp[dt][dept])return s;
-    return s+Object.values(exp[dt][dept]).reduce((cs,cats)=>cs+(cats[cat]||0),0);
-  },0);
-  const expAllDepts=(mths)=>{
-    const DEPTS=['COGS: Infrastructure','COGS: Services','Engineering','Product','Customer Success','Sales','Marketing','G&A'];
-    return DEPTS.reduce((s,d)=>s+expSum(mths,d,'',''),0);
-  };
-  return {rev,exp,revSum,revTotal,expSum,expCatSum,expDeptCatSum,expAllDepts};
+  return reps;
 }
 
-// Budget: revenue stored as positive, expenses stored as positive
-function preProcessBudget(rows) {
-  const rev={}, exp={};
+function preProcessTargets(rows){
+  const ae = {}, aeManager = {}, aeAnnual = {}, aeYtd = {}, aeQtr = {};
+  const YTD_MONTHS = new Set(['2026-02-01','2026-03-01','2026-04-01','2026-05-01','2026-06-01']);
   for (const r of rows) {
-    const dt=parseDate(r.TIME_MONTH_END);
-    const amt=+(r.BUDGET||0);
-    const cr=r.C_REVENUE||'', dept=r.C_PARENT_DEPT||'', cls=r.C_PL_CLASS||'', cat=r.C_EXPENSE_CATEGORY||'';
-    if(cr) {
-      if(!rev[dt])rev[dt]={};
-      rev[dt][cr]=(rev[dt][cr]||0)+amt;
-    } else if(dept) {
-      if(!exp[dt])exp[dt]={};
-      if(!exp[dt][dept])exp[dt][dept]={};
-      if(!exp[dt][dept][cls])exp[dt][dept][cls]={};
-      exp[dt][dept][cls][cat]=(exp[dt][dept][cls][cat]||0)+amt;
+    if (r.ROLE_TYPE !== 'AE') continue;
+    const name = alias(r.NAME||''), val = +(r.TARGET||0), mgr = alias(r.MANAGER_NAME||'');
+    if (EXCLUDED_REPS.has(name)) continue;
+    const m = parseDate(r.MONTH_START);
+    if (mgr && !aeManager[name]) aeManager[name] = mgr;
+    aeAnnual[name] = (aeAnnual[name]||0) + val;
+    if (YTD_MONTHS.has(m)) aeYtd[name] = (aeYtd[name]||0) + val;
+    for (const q of QUARTERS) {
+      if (q.months.includes(m)) { if(!aeQtr[q.fq]) aeQtr[q.fq]={}; aeQtr[q.fq][name]=(aeQtr[q.fq][name]||0)+val; }
     }
   }
-  const revSum=(mths,type)=>mths.reduce((s,dt)=>s+((rev[dt]&&rev[dt][type])||0),0);
-  const revTotal=(mths)=>mths.reduce((s,dt)=>{if(!rev[dt])return s;return s+Object.values(rev[dt]).reduce((a,b)=>a+b,0);},0);
-  const expSum=(mths,dept,cls,cat)=>mths.reduce((s,dt)=>{
-    if(!exp[dt])return s;
-    const d=exp[dt][dept];if(!d)return s;
-    if(cls&&cat)return s+((d[cls]&&d[cls][cat])||0);
-    if(cls){if(!d[cls])return s;return s+Object.values(d[cls]).reduce((a,b)=>a+b,0);}
-    return s+Object.values(d).reduce((dv,cm)=>dv+Object.values(cm).reduce((a,b)=>a+b,0),0);
-  },0);
-  const expCatSum=(mths,cat)=>mths.reduce((s,dt)=>{
-    if(!exp[dt])return s;
-    return s+Object.values(exp[dt]).reduce((ds,cm)=>ds+Object.values(cm).reduce((cs,cats)=>cs+(cats[cat]||0),0),0);
-  },0);
-  const expDeptCatSum=(mths,dept,cat)=>mths.reduce((s,dt)=>{
-    if(!exp[dt]||!exp[dt][dept])return s;
-    return s+Object.values(exp[dt][dept]).reduce((cs,cats)=>cs+(cats[cat]||0),0);
-  },0);
-  const expAllDepts=(mths)=>{
-    const DEPTS=['COGS: Infrastructure','COGS: Services','Engineering','Product','Customer Success','Sales','Marketing','G&A'];
-    return DEPTS.reduce((s,d)=>s+expSum(mths,d,'',''),0);
-  };
-  return {rev,exp,revSum,revTotal,expSum,expCatSum,expDeptCatSum,expAllDepts};
+  return { aeManager, aeAnnual, aeYtd, aeQtr, aeNames: Object.keys(aeAnnual) };
 }
 
-function preProcessARR(rows) {
-  const m={};
-  for(const r of rows){const dt=parseDate(r.MONTH_END_DT);m[dt]={carArr:+(r.C_ARR||0),newArr:+(r.NEW_ARR||0),expArr:+(r.EXP_ARR||0),churn:+(r.CHURN_ARR||0),upRenew:+(r.UP_RENEWAL||0),renewed:+(r.RENEWED_ARR||0)};}
-  const get=dt=>m[dt]||{carArr:0,newArr:0,expArr:0,churn:0,upRenew:0,renewed:0};
-  const bop=dt=>({[CURRENT]:PREV,[PREV]:'2026-02-28','2026-02-28':BOP_DT}[dt])?get(({[CURRENT]:PREV,[PREV]:'2026-02-28','2026-02-28':BOP_DT}[dt])).carArr:0;
-  return{get,bop};
-}
-function preProcessCash(rows){const m={};for(const r of rows){m[parseDate(r.MONTH_END_DATE)]=+(r.CASH||0);}const get=dt=>m[dt]||0;const burn=dt=>get(dt)-get({[CURRENT]:PREV,[PREV]:'2026-02-28','2026-02-28':BOP_DT}[dt]||BOP_DT);return{get,burn};}
-function preProcessBC(bRows,cRows){const b={},c={};for(const r of bRows)b[parseDate(r.PERIOD)]=+(r.AMOUNT||0);for(const r of cRows)c[parseDate(r.PERIOD)]=+(r.AMOUNT||0);const bS=mths=>mths.reduce((s,dt)=>s+(b[dt]||0),0),cS=mths=>mths.reduce((s,dt)=>s+(c[dt]||0),0);return{b,c,bS,cS};}
-function preProcessHC(rows,bridge){
-  const DEPTS=['COGS: Infrastructure','COGS: Services','Engineering','Product','Customer Success','Sales','Marketing','G&A'];
-  const byDept={};for(const r of rows){const d=r.DEPT;if(!byDept[d])byDept[d]={feb:0,mar:0,apr:0,may:0,jun:0};byDept[d].feb+=+(r.HC_FEB||0);byDept[d].mar+=+(r.HC_MAR||0);byDept[d].apr+=+(r.HC_APR||0);byDept[d].may+=+(r.HC_MAY||0);byDept[d].jun+=+(r.HC_JUN||0);}
-  const hires=bridge.filter(r=>r.EVT==='Hire').reduce((s,r)=>s+ +(r.CNT||0),0);
-  const vol=bridge.filter(r=>r.EVT==='Voluntary').reduce((s,r)=>s+ +(r.CNT||0),0);
-  const inv=bridge.filter(r=>r.EVT==='Involuntary').reduce((s,r)=>s+ +(r.CNT||0),0);
-  const tot=(f)=>DEPTS.reduce((s,d)=>s+((byDept[d]&&byDept[d][f])||0),0);
-  return{byDept,DEPTS,hires,vol,inv,totFeb:tot('feb'),totMar:tot('mar'),totApr:tot('apr'),totMay:tot('may'),totJun:tot('jun')};
-}
-function preProcessSales(rows){
-  const reps={};
-  for(const r of rows){
-    const raw=r.OPPORTUNITY_OWNER;
-    const rep=NAME_ALIAS[raw]||raw;
-    const dt=parseDate(r.CLOSE_MONTH),mgr=r.ACCOUNT_RVP||'';
-    if(!reps[rep])reps[rep]={mgr,byMonth:{}};
-    reps[rep].byMonth[dt]=(reps[rep].byMonth[dt]||0)+ +(r.CLOSED_ARR||0);
-    if(mgr)reps[rep].mgr=mgr;
-  }
-  return{reps};
-}
-
-function preProcessSalesTargets(rows) {
-  // MONTH_START is first-of-month; map to month-end dates used by actuals
-  const mMap={'2026-02-01':'2026-02-28','2026-03-01':'2026-03-31','2026-04-01':'2026-04-30','2026-05-01':'2026-05-31','2026-06-01':'2026-06-30','2026-07-01':'2026-07-31'};
-  const REMAINING_SET=new Set(['2026-08-01','2026-09-01','2026-10-01','2026-11-01','2026-12-01','2027-01-01']);
-  const ae={}, rvp={}, aeManager={}, aeRemaining={}, rvpRemaining={};
-  for(const r of rows){
-    const name=r.NAME||'', val=+(r.TARGET||0), mgr=r.MANAGER_NAME||'';
-    const rawMonth=parseDate(r.MONTH_START);
-    if(mgr && !aeManager[name] && r.ROLE_TYPE==='AE') aeManager[name]=NAME_ALIAS[mgr]||mgr;
-    if(REMAINING_SET.has(rawMonth)){
-      if(r.ROLE_TYPE==='AE') aeRemaining[name]=(aeRemaining[name]||0)+val;
-      else if(r.ROLE_TYPE==='RVP') rvpRemaining[name]=(rvpRemaining[name]||0)+val;
-    } else {
-      const dt=mMap[rawMonth]; if(!dt) continue;
-      if(r.ROLE_TYPE==='AE'){
-        if(!ae[name])ae[name]={};
-        ae[name][dt]=val;
-      } else if(r.ROLE_TYPE==='RVP'){
-        if(!rvp[name])rvp[name]={};
-        rvp[name][dt]=val;
-      }
-    }
-  }
-  const get=(map,name,months)=>months.reduce((s,dt)=>s+(map[name]?.[dt]||0),0);
-  return{
-    ae:(name,months)=>get(ae,name,months),
-    rvp:(name,months)=>get(rvp,name,months),
-    aeRemaining:(name)=>aeRemaining[name]||0,
-    rvpRemaining:(name)=>rvpRemaining[name]||0,
-    aeNames:()=>Object.keys(ae),
-    rvpNames:()=>Object.keys(rvp),
-    managerOf:(name)=>aeManager[name]||''
-  };
-}
-
-function preProcessPipeline(rows) {
-  const byRep = {};
-  for (const r of rows) {
-    const rep = NAME_ALIAS[r.REP_NAME] || r.REP_NAME;
-    byRep[rep] = (byRep[rep] || 0) + +(r.PIPELINE || 0);
-  }
-  return { get: (name) => byRep[name] || 0, all: byRep };
-}
-
-function preProcessKPI(rows) {
-  // Stores budget values by account code and month
-  const d = {};
-  for (const r of rows) {
-    const code = r.ACCOUNT_CODE;
-    const dt   = parseDate(r.TIME_MONTH_END);
-    const val  = +(r.BUDGET || 0);
-    if (!d[code]) d[code] = {};
-    d[code][dt] = val;
-  }
-  // flow(code, months): sum over months (New ARR, Cash Burn, etc.)
-  const flow = (code, months) => months.reduce((s, dt) => s + (d[code]?.[dt] || 0), 0);
-  // eop(code, dt): point-in-time value (Exiting ARR, Cash EOP, HC)
-  const eop  = (code, dt) => d[code]?.[dt] || 0;
-  // Implied BOP FY (Jan EOP budget) derived from Feb bridge:
-  // BOP = EOP_Feb - New_Feb - Exp_Feb - Churn_Feb
-  const bopFY = () => {
-    const eopFeb  = eop('KPI.Exiting_ARR', '2026-02-28');
-    const newFeb  = eop('KPI.NewARR',       '2026-02-28');
-    const expFeb  = eop('KPI.ExpansionARR', '2026-02-28');
-    const chnFeb  = eop('KPI.Downsell_Churn','2026-02-28');
-    return eopFeb - newFeb - expFeb - chnFeb;
-  };
-  return { flow, eop, bopFY };
-}
-
-function preProcessHCDeptBudget(rows) {
-  const m = {};
-  for (const r of rows) { m[r.C_PARENT_DEPT] = Math.round(+(r.BUDGET || 0)); }
-  return m;
-}
-
-// ─── BUILD FUNCTIONS ─────────────────────────────────
-function buildExec(fin, bud, arr, cash, bill, hc, kpi) {
-  document.getElementById('execHead').innerHTML = makeHead9('220px');
-  const mRevA=fin.revTotal([CURRENT]), mRevB=bud.revTotal([CURRENT]);
-  const qRevA=fin.revTotal(QTD),      qRevB=bud.revTotal(QTD);
-  const yRevA=fin.revTotal(YTD),      yRevB=bud.revTotal(YTD);
-  const mExpA=fin.expAllDepts([CURRENT]), mExpB=bud.expAllDepts([CURRENT]);
-  const qExpA=fin.expAllDepts(QTD),       qExpB=bud.expAllDepts(QTD);
-  const yExpA=fin.expAllDepts(YTD),       yExpB=bud.expAllDepts(YTD);
-  const bopFY=arr.bop('2026-02-28'), bopM=arr.bop(CURRENT);
-  const eopA=arr.get(CURRENT).carArr;
-  const qChurn=QTD.reduce((s,dt)=>s+arr.get(dt).churn,0);
-  const yChurn=YTD.reduce((s,dt)=>s+arr.get(dt).churn,0);
-  const qExpArr=QTD.reduce((s,dt)=>s+arr.get(dt).expArr,0);
-  const yExpArr=YTD.reduce((s,dt)=>s+arr.get(dt).expArr,0);
-  const qNewExp=QTD.reduce((s,dt)=>s+arr.get(dt).newArr+arr.get(dt).expArr,0);
-  const yNewExp=YTD.reduce((s,dt)=>s+arr.get(dt).newArr+arr.get(dt).expArr,0);
-  const mNewExp=arr.get(CURRENT).newArr+arr.get(CURRENT).expArr;
-  const mChurn=arr.get(CURRENT).churn;
-  const mCash=cash.get(CURRENT), mBurn=cash.burn(CURRENT), qBurn=mCash-cash.get(BOP_DT);
-  const mEbitdaA=mRevA-mExpA, mEbitdaB=mRevB-mExpB;
-  const qEbitdaA=qRevA-qExpA, qEbitdaB=qRevB-qExpB;
-  const yEbitdaA=yRevA-yExpA, yEbitdaB=yRevB-yExpB;
-
-  // KPI budgets
-  const mNewArrB  = kpi.eop('KPI.NewARR',        CURRENT)/1e3;
-  const mExpArrB  = kpi.eop('KPI.ExpansionARR',   CURRENT)/1e3;
-  const mChurnB   = kpi.eop('KPI.Downsell_Churn', CURRENT)/1e3;
-  const mEopArrB  = kpi.eop('KPI.Exiting_ARR',    CURRENT)/1e3;
-  const qNewArrB  = kpi.flow('KPI.NewARR',        QTD)/1e3;
-  const qExpArrB  = kpi.flow('KPI.ExpansionARR',  QTD)/1e3;
-  const qChurnB   = kpi.flow('KPI.Downsell_Churn',QTD)/1e3;
-  const yNewArrB  = kpi.flow('KPI.NewARR',        YTD)/1e3;
-  const yExpArrB  = kpi.flow('KPI.ExpansionARR',  YTD)/1e3;
-  const yChurnB   = kpi.flow('KPI.Downsell_Churn',YTD)/1e3;
-  const qEopArrB  = kpi.eop('KPI.Exiting_ARR',   CURRENT)/1e3; // period-end
-  const mCashBurnB= kpi.eop('Adjusted_CF',        CURRENT)/1e3;
-  const qCashBurnB= kpi.flow('Adjusted_CF',       QTD)/1e3;
-  const yCashBurnB= kpi.flow('Adjusted_CF',       YTD)/1e3;
-  const mCashEopB = kpi.eop('Cash_EOP',           CURRENT)/1e3;
-  const hcB       = Math.round(kpi.eop('Total_HC_EOM', CURRENT));
-
-  let h='';
-  h+=secRow('ARR');
-  h+=row9('New + Expansion ARR',mNewExp/1e3,(mNewArrB+mExpArrB)||null,qNewExp/1e3,(qNewArrB+qExpArrB)||null,yNewExp/1e3,(yNewArrB+yExpArrB)||null,{varDir:1});
-  h+=row9('Churn / Downsell',mChurn/1e3,mChurnB||null,qChurn/1e3,qChurnB||null,yChurn/1e3,yChurnB||null,{varDir:-1});
-  h+=row9('EOP ARR',eopA/1e3,mEopArrB||null,eopA/1e3,qEopArrB||null,eopA/1e3,qEopArrB||null,{varDir:1});
-  h+=spacer();
-  h+=secRow('Revenue');
-  h+=row9('Total Revenue',mRevA/1e3,mRevB/1e3,qRevA/1e3,qRevB/1e3,yRevA/1e3,yRevB/1e3,{varDir:1});
-  h+=row9('  Subscription',fin.revSum([CURRENT],'Subscription Revenue')/1e3,bud.revSum([CURRENT],'Subscription Revenue')/1e3,fin.revSum(QTD,'Subscription Revenue')/1e3,bud.revSum(QTD,'Subscription Revenue')/1e3,fin.revSum(YTD,'Subscription Revenue')/1e3,bud.revSum(YTD,'Subscription Revenue')/1e3,{varDir:1,lc:'label-indent'});
-  h+=row9('  Consumption',fin.revSum([CURRENT],'Consumption Revenue')/1e3,bud.revSum([CURRENT],'Consumption Revenue')/1e3,fin.revSum(QTD,'Consumption Revenue')/1e3,bud.revSum(QTD,'Consumption Revenue')/1e3,fin.revSum(YTD,'Consumption Revenue')/1e3,bud.revSum(YTD,'Consumption Revenue')/1e3,{varDir:1,lc:'label-indent'});
-  h+=row9('  Services',fin.revSum([CURRENT],'Services Revenue')/1e3,bud.revSum([CURRENT],'Services Revenue')/1e3,fin.revSum(QTD,'Services Revenue')/1e3,bud.revSum(QTD,'Services Revenue')/1e3,fin.revSum(YTD,'Services Revenue')/1e3,bud.revSum(YTD,'Services Revenue')/1e3,{varDir:1,lc:'label-indent'});
-  h+=spacer();
-  h+=secRow('Expenses & Profitability');
-  h+=row9('Total Expense',mExpA/1e3,mExpB/1e3,qExpA/1e3,qExpB/1e3,yExpA/1e3,yExpB/1e3,{varDir:-1});
-  h+=row9('EBITDA',mEbitdaA/1e3,mEbitdaB/1e3,qEbitdaA/1e3,qEbitdaB/1e3,yEbitdaA/1e3,yEbitdaB/1e3,{varDir:1});
-  // EBITDA margin as pp
-  const mEbitdaMrgA=mRevA?mEbitdaA/mRevA:0, mEbitdaMrgB=mRevB?mEbitdaB/mRevB:0;
-  const qEbitdaMrgA=qRevA?qEbitdaA/qRevA:0, qEbitdaMrgB=qRevB?qEbitdaB/qRevB:0;
-  const yEbitdaMrgA=yRevA?yEbitdaA/yRevA:0, yEbitdaMrgB=yRevB?yEbitdaB/yRevB:0;
-  h+=rowPct('  EBITDA Margin %',mEbitdaMrgA,mEbitdaMrgB,qEbitdaMrgA,qEbitdaMrgB,yEbitdaMrgA,yEbitdaMrgB,{cls:'row-margin',lc:'label-indent',varDir:1});
-  h+=row9('Cash Burn (MoM)',mBurn/1e3,mCashBurnB||null,qBurn/1e3,qCashBurnB||null,qBurn/1e3,yCashBurnB||null,{varDir:1});
-  h+=row9('Ending Cash',mCash/1e3,mCashEopB||null,mCash/1e3,mCashEopB||null,mCash/1e3,mCashEopB||null,{varDir:1});
-  h+=spacer();
-  h+=secRow('Headcount');
-  const hcVar=hcB?hc.totJun-hcB:null;
-  const hcVc=hcVar==null?'var-flat':hcVar<0?'var-good':'var-bad';
-  const hcVs=hcVar==null?'—':(hcVar>0?'+':'')+hcVar;
-  h+=`<tr><td class="label-col">Total HC (EOP)</td><td class="col-m">${hc.totJun}</td><td class="col-mb">${hcB||'—'}</td><td class="col-mv ${hcVc}">${hcVs}</td><td></td><td class="col-q divider-left">${hc.totJun}</td><td class="col-qb">${hcB||'—'}</td><td class="col-qv ${hcVc}">${hcVs}</td><td></td><td class="col-y divider-left">${hc.totJun}</td><td class="col-yb">${hcB||'—'}</td><td class="col-yv ${hcVc}">${hcVs}</td></tr>`;
-  document.getElementById('execBody').innerHTML=h;
-}
-
-function buildARR(arr, kpi) {
-  document.getElementById('arrHead').innerHTML = makeHead9('220px');
-  const bopFY=arr.bop('2026-02-28'), bopM=arr.bop(CURRENT), eopA=arr.get(CURRENT).carArr;
-  const qtdNew=QTD.reduce((s,dt)=>s+arr.get(dt).newArr,0);
-  const ytdNew=YTD.reduce((s,dt)=>s+arr.get(dt).newArr,0);
-  const qtdExp=QTD.reduce((s,dt)=>s+arr.get(dt).expArr,0);
-  const ytdExp=YTD.reduce((s,dt)=>s+arr.get(dt).expArr,0);
-  const qtdChurn=QTD.reduce((s,dt)=>s+arr.get(dt).churn,0);
-  const ytdChurn=YTD.reduce((s,dt)=>s+arr.get(dt).churn,0);
-  const qtdUp=QTD.reduce((s,dt)=>s+arr.get(dt).upRenew,0);
-  const ytdUp=YTD.reduce((s,dt)=>s+arr.get(dt).upRenew,0);
-  const qtdRenewed=QTD.reduce((s,dt)=>s+arr.get(dt).renewed,0);
-  const ytdRenewed=YTD.reduce((s,dt)=>s+arr.get(dt).renewed,0);
-  const gdrM=bopM>0?(bopM+arr.get(CURRENT).churn)/bopM:0;
-  const gdrQ=bopFY>0?(bopFY+qtdChurn)/bopFY:0;
-  const gdrY=bopFY>0?(bopFY+ytdChurn)/bopFY:0;
-  const ndrM=bopM>0?(bopM+arr.get(CURRENT).churn+arr.get(CURRENT).expArr)/bopM:0;
-  const ndrQ=bopFY>0?(bopFY+qtdChurn+qtdExp)/bopFY:0;
-  const ndrY=bopFY>0?(bopFY+ytdChurn+ytdExp)/bopFY:0;
-  const grPctM=arr.get(CURRENT).upRenew?arr.get(CURRENT).renewed/Math.abs(arr.get(CURRENT).upRenew):0;
-  const grPctQ=qtdUp?qtdRenewed/Math.abs(qtdUp):0;
-  const grPctY=ytdUp?ytdRenewed/Math.abs(ytdUp):0;
-
-  // KPI budgets
-  const mNewB  = kpi.eop('KPI.NewARR',            CURRENT)/1e3;
-  const mExpB  = kpi.eop('KPI.ExpansionARR',      CURRENT)/1e3;
-  const mChnB  = kpi.eop('KPI.Downsell_Churn',    CURRENT)/1e3;
-  const mEopB  = kpi.eop('KPI.Exiting_ARR',       CURRENT)/1e3;
-  const mUpRenB= kpi.eop('Bookings.UpForRenewal',  CURRENT)/1e3;
-  const qNewB  = kpi.flow('KPI.NewARR',            QTD)/1e3;
-  const qExpB  = kpi.flow('KPI.ExpansionARR',      QTD)/1e3;
-  const qChnB  = kpi.flow('KPI.Downsell_Churn',    QTD)/1e3;
-  const yNewB  = kpi.flow('KPI.NewARR',            YTD)/1e3;
-  const yExpB  = kpi.flow('KPI.ExpansionARR',      YTD)/1e3;
-  const yChnB  = kpi.flow('KPI.Downsell_Churn',    YTD)/1e3;
-  const yUpRenB= kpi.flow('Bookings.UpForRenewal',  YTD)/1e3;
-  const qEopB  = mEopB; // EOP = May period-end for both Month and QTD
-  const qUpRenB= kpi.flow('Bookings.UpForRenewal',  QTD)/1e3;
-  const bopFYB = kpi.bopFY()/1e3;
-  const bopMB  = kpi.eop('KPI.Exiting_ARR', PREV)/1e3; // BOP Jun = EOP May
-  // Budget retention rates
-  const gdrMB  = bopMB>0?(bopMB+mChnB)/bopMB:0;
-  const gdrQB  = bopFYB>0?(bopFYB+qChnB)/bopFYB:0;
-  const gdrYB  = bopFYB>0?(bopFYB+yChnB)/bopFYB:0;
-  const ndrMB  = bopMB>0?(bopMB+mChnB+mExpB)/bopMB:0;
-  const ndrQB  = bopFYB>0?(bopFYB+qChnB+qExpB)/bopFYB:0;
-  const ndrYB  = bopFYB>0?(bopFYB+yChnB+yExpB)/bopFYB:0;
-  // Budget Gross Renewal %: (UpForRenewal + Churn) / UpForRenewal
-  const grPctMB = Math.abs(mUpRenB)>0?(mUpRenB+mChnB)/Math.abs(mUpRenB):0;
-  const grPctQB = Math.abs(qUpRenB)>0?(qUpRenB+qChnB)/Math.abs(qUpRenB):0;
-  const grPctYB = Math.abs(yUpRenB)>0?(yUpRenB+yChnB)/Math.abs(yUpRenB):0;
-
-  let h='';
-  h+=secRow('New Business');
-  h+=row9('New ARR',arr.get(CURRENT).newArr/1e3,mNewB,qtdNew/1e3,qNewB,ytdNew/1e3,yNewB,{varDir:1});
-  h+=row9('Expansion ARR',arr.get(CURRENT).expArr/1e3,mExpB,qtdExp/1e3,qExpB,ytdExp/1e3,yExpB,{varDir:1});
-  h+=row9('Gross New + Expansion',(arr.get(CURRENT).newArr+arr.get(CURRENT).expArr)/1e3,(mNewB+mExpB),(qtdNew+qtdExp)/1e3,(qNewB+qExpB),(ytdNew+ytdExp)/1e3,(yNewB+yExpB),{cls:'row-subtotal',varDir:1,fmtFn:KD});
-  h+=spacer();
-  h+=secRow('Renewals');
-  h+=row9('Up for Renewal',Math.abs(arr.get(CURRENT).upRenew)/1e3,Math.abs(mUpRenB),Math.abs(qtdUp)/1e3,Math.abs(qUpRenB),Math.abs(ytdUp)/1e3,Math.abs(yUpRenB),{varDir:1});
-  h+=row9('Churn / Downsell',arr.get(CURRENT).churn/1e3,mChnB,qtdChurn/1e3,qChnB,ytdChurn/1e3,yChnB,{varDir:-1});
-  h+=row9('Gross Renewal ARR',arr.get(CURRENT).renewed/1e3,(mUpRenB+mChnB),qtdRenewed/1e3,(qUpRenB+qChnB),ytdRenewed/1e3,(yUpRenB+yChnB),{cls:'row-subtotal',varDir:1,fmtFn:KD});
-  h+=rowPct('Gross Renewal %',grPctM,grPctMB,grPctQ,grPctQB,grPctY,grPctYB,{cls:'row-margin',varDir:1});
-  h+=spacer();
-  h+=secRow('ARR Position');
-  h+=row9('BOP ARR',bopM/1e3,bopMB,bopFY/1e3,bopFYB,bopFY/1e3,bopFYB,{varDir:1,fmtFn:KD});
-  h+=row9('EOP ARR',eopA/1e3,mEopB,eopA/1e3,qEopB,eopA/1e3,qEopB,{cls:'row-subtotal',varDir:1,fmtFn:KD});
-  h+=spacer();
-  h+=secRow('Retention Rates');
-  h+=rowPct('G$R',gdrM,gdrMB,gdrQ,gdrQB,gdrY,gdrYB,{varDir:1});
-  h+=rowPct('N$R',ndrM,ndrMB,ndrQ,ndrQB,ndrY,ndrYB,{varDir:1});
-  document.getElementById('arrBody').innerHTML=h;
-  const wfVals=[bopFY/1e3,eopA/1e3];
-  const wfMin=Math.min(...wfVals)*0.9, wfMax=Math.max(...wfVals)*1.1;
-  drawWF('arrBridgeChart',['BOP','+New','+Exp','−Churn','EOP'],[{t:'start',v:bopFY/1e3,c:BRAND.lime},{t:'inc',v:ytdNew/1e3},{t:'inc',v:ytdExp/1e3},{t:'dec',v:Math.abs(ytdChurn)/1e3},{t:'end',v:eopA/1e3}],{yMin:wfMin,yMax:wfMax});
-  drawBar('arrMonthlyChart',['Feb-26','Mar-26','Apr-26','May-26','Jun-26'],[{label:'New+Exp ARR',data:YTD.map(dt=>(arr.get(dt).newArr+arr.get(dt).expArr)/1e3),backgroundColor:C_ACT}]);
-}
-
-function buildSales(sales, tgt, pipeline) {
-  // inject header with Target + Pipeline columns
-  document.getElementById('salesHead').innerHTML=`<tr class="group-header">
-    <th class="label-col hdr-m" style="width:200px;font-size:9px;color:#9ba3af;text-transform:none;letter-spacing:0;font-weight:400">$K</th>
-    <th colspan="3" class="hdr-m">Month (Jun)</th><th class="hdr-spacer"></th>
-    <th colspan="3" class="hdr-q">QTD (May–Jun)</th><th class="hdr-spacer"></th>
-    <th colspan="3" class="hdr-y">YTD (Actuals Feb–Jun · Quota Feb–Jul)</th><th class="hdr-spacer"></th>
-    <th colspan="2" class="hdr-y">Pipeline (Stage 1+)</th>
-  </tr>
-  <tr class="col-header">
-    <th class="label-col"></th>
-    <th class="col-m">Actuals</th><th class="col-mb">Target</th><th class="col-mv">% to Tgt</th>
-    <th class="hdr-spacer"></th>
-    <th class="col-q divider-left">Actuals</th><th class="col-qb">Target</th><th class="col-qv">% to Tgt</th>
-    <th class="hdr-spacer"></th>
-    <th class="col-y divider-left">Actuals</th><th class="col-yb">Target</th><th class="col-yv">% to Tgt</th>
-    <th class="hdr-spacer"></th>
-    <th class="col-y divider-left">Total $K</th><th class="col-y">Coverage</th>
-  </tr>`;
-
-  // Build roster entirely from targets — active AEs grouped by MANAGER_NAME
-  const mgrs={};
-  for(const aeName of tgt.aeNames()){
-    const m=tgt.managerOf(aeName)||'Unassigned';
-    if(!mgrs[m])mgrs[m]=[];
-    mgrs[m].push(aeName);
-  }
-  const repAct=(rep,mths)=>mths.reduce((s,dt)=>s+(sales.reps[rep]?.byMonth[dt]||0),0);
-  const mgrAct=(mgr,mths)=>(mgrs[mgr]||[]).reduce((s,rep)=>s+repAct(rep,mths),0);
-
-  const sRow=(lc,mA,mT,qA,qT,yA,yT,pipe=null,remainT=0,cls='',indent=false)=>{
-    const tdL=indent?'label-indent':'label-col';
-    const pM=mT?mA/mT:null, pQ=qT?qA/qT:null, pY=yT?yA/yT:null;
-    const vcM=pM==null?'var-flat':pM>=1?'var-good':'var-bad';
-    const vcQ=pQ==null?'var-flat':pQ>=1?'var-good':'var-bad';
-    const vcY=pY==null?'var-flat':pY>=1?'var-good':'var-bad';
-    const vfM=pM==null?'—':(pM*100).toFixed(0)+'%';
-    const vfQ=pQ==null?'—':(pQ*100).toFixed(0)+'%';
-    const vfY=pY==null?'—':(pY*100).toFixed(0)+'%';
-    const pipeK=pipe!=null?K(pipe/1e3):'—';
-    const covg=pipe!=null&&remainT>0?(pipe/remainT).toFixed(1)+'x':'—';
-    const covgCls=pipe==null||!remainT?'var-flat':pipe/remainT>=3?'var-good':pipe/remainT>=2?'var-flat':'var-bad';
-    return `<tr class="${cls}">
-      <td class="${tdL}">${lc}</td>
-      <td class="col-m">${K(mA/1e3)}</td><td class="col-mb">${mT?K(mT/1e3):'—'}</td><td class="col-mv ${vcM}">${vfM}</td>
-      <td></td>
-      <td class="col-q divider-left">${K(qA/1e3)}</td><td class="col-qb">${qT?K(qT/1e3):'—'}</td><td class="col-qv ${vcQ}">${vfQ}</td>
-      <td></td>
-      <td class="col-y divider-left">${K(yA/1e3)}</td><td class="col-yb">${yT?K(yT/1e3):'—'}</td><td class="col-yv ${vcY}">${vfY}</td>
-      <td></td>
-      <td class="col-y divider-left">${pipeK}</td><td class="col-y ${covgCls}">${covg}</td>
-    </tr>`;
-  };
-
-  // totTgt accumulates AE quotas (not RVP rollup) so Total row = sum of visible rep rows
-  let h='', totActM=0, totActQ=0, totActY=0, totTgtM=0, totTgtQ=0, totTgtY=0, totPipe=0, totRemaining=0;
-  for(const mgr of Object.keys(mgrs).sort((a,b)=>mgrAct(b,YTD)-mgrAct(a,YTD))){
-    const mA=mgrAct(mgr,[CURRENT]), qA=mgrAct(mgr,QTD), yA=mgrAct(mgr,YTD);
-    // Manager row uses RVP's own individual quota (not AE rollup)
-    const mT=tgt.rvp(mgr,[CURRENT]), qT=tgt.rvp(mgr,QTD), yT=tgt.rvp(mgr,YTD_TGT);
-    // Manager pipeline = sum of all AEs under them + their own if present
-    const mgrPipe=(mgrs[mgr]||[]).reduce((s,rep)=>s+pipeline.get(rep),0)+pipeline.get(mgr);
-    const mgrRemaining=tgt.rvpRemaining(mgr);
-    totActM+=mA; totActQ+=qA; totActY+=yA; totPipe+=mgrPipe;
-    h+=sRow(mgr||'Unassigned', mA, mT, qA, qT, yA, yT, mgrPipe||null, mgrRemaining, 'row-manager');
-    for(const rep of (mgrs[mgr]||[]).sort((a,b)=>repAct(b,YTD)-repAct(a,YTD))){
-      const rM=repAct(rep,[CURRENT]), rQ=repAct(rep,QTD), rY=repAct(rep,YTD);
-      const rtM=tgt.ae(rep,[CURRENT]), rtQ=tgt.ae(rep,QTD), rtY=tgt.ae(rep,YTD_TGT);
-      const repPipe=pipeline.get(rep)||null;
-      const repRemaining=tgt.aeRemaining(rep);
-      // Accumulate AE quotas for the Total row
-      totTgtM+=rtM; totTgtQ+=rtQ; totTgtY+=rtY; totRemaining+=repRemaining;
-      h+=sRow(rep, rM, rtM, rQ, rtQ, rY, rtY, repPipe, repRemaining, '', true);
-    }
-  }
-  h+=sRow('Total', totActM, totTgtM, totActQ, totTgtQ, totActY, totTgtY, totPipe||null, totRemaining, 'row-total');
-  document.getElementById('salesBody').innerHTML=h;
-}
-
-function buildRevenue(fin, bud) {
-  document.getElementById('revHead').innerHTML=makeHead9('220px');
-  const TYPES=['Subscription Revenue','Consumption Revenue','Services Revenue','Pilot Revenue','Other Revenue'];
-  let h='';
-  for(const t of TYPES){
-    const mA=fin.revSum([CURRENT],t),mB=bud.revSum([CURRENT],t);
-    const qA=fin.revSum(QTD,t),qB=bud.revSum(QTD,t);
-    const yA=fin.revSum(YTD,t),yB=bud.revSum(YTD,t);
-    h+=row9(t,mA/1e3,mB/1e3,qA/1e3,qB/1e3,yA/1e3,yB/1e3,{varDir:1});
-  }
-  h+=spacer();
-  const mTA=fin.revTotal([CURRENT]),mTB=bud.revTotal([CURRENT]);
-  const qTA=fin.revTotal(QTD),qTB=bud.revTotal(QTD);
-  const yTA=fin.revTotal(YTD),yTB=bud.revTotal(YTD);
-  h+=row9('Total Revenue',mTA/1e3,mTB/1e3,qTA/1e3,qTB/1e3,yTA/1e3,yTB/1e3,{cls:'row-total',varDir:1,fmtFn:KD});
-  document.getElementById('revBody').innerHTML=h;
-  // Chart: actuals vs budget monthly (YTD Feb-May)
-  const labels=['Feb-26','Mar-26','Apr-26','May-26','Jun-26'];
-  const actD=YTD.map(dt=>fin.revTotal([dt])/1e3), budD=YTD.map(dt=>bud.revTotal([dt])/1e3);
-  new Chart(document.getElementById('revMonthlyChart'),{type:'bar',data:{labels,datasets:[{label:'Actuals',data:actD,backgroundColor:C_ACT,borderRadius:3},{label:'Budget',data:budD,backgroundColor:C_BUD,borderRadius:3}]},options:{responsive:true,layout:{padding:{top:16}},plugins:{legend:{position:'top'}},scales:{x:{grid:{display:false}},y:{grid:{color:'#f1f5f9'},ticks:{callback:v=>N(v)}}}}});
-}
-
-function buildTTM(fin) {
-  const TYPES=['Subscription Revenue','Consumption Revenue','Services Revenue','Pilot Revenue','Other Revenue'];
-  let h='';
-  for(const t of TYPES){const vs=TTM.map(dt=>fin.revSum([dt],t)/1e3);const ttm=vs.reduce((a,b)=>a+b,0);h+=`<tr><td class="label-col">${t}</td>${vs.map(v=>`<td>${K(v)}</td>`).join('')}<td class="ttm-col-ttm">${K(ttm)}</td></tr>`;}
-  h+=`<tr class="row-spacer"><td colspan="14"></td></tr>`;
-  const tots=TTM.map(dt=>fin.revTotal([dt])/1e3);const ttmT=tots.reduce((a,b)=>a+b,0);
-  h+=`<tr class="row-total"><td class="label-col">Total Revenue</td>${tots.map(v=>`<td>${K(v)}</td>`).join('')}<td class="ttm-col-ttm">${K(ttmT)}</td></tr>`;
-  document.getElementById('ttmBody').innerHTML=h;
-  const sub=TTM.map(dt=>fin.revSum([dt],'Subscription Revenue')/1e3);
-  const cons=TTM.map(dt=>fin.revSum([dt],'Consumption Revenue')/1e3);
-  const svc=TTM.map(dt=>fin.revSum([dt],'Services Revenue')/1e3);
-  new Chart(document.getElementById('ttmStackChart'),{type:'bar',data:{labels:TTM_LBL,datasets:[{label:'Subscription',data:sub,backgroundColor:BRAND.black,borderWidth:0},{label:'Consumption',data:cons,backgroundColor:BRAND.teal,borderWidth:0},{label:'Services',data:svc,backgroundColor:BRAND.lime,borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:'top'}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,grid:{color:'#f1f5f9'},ticks:{callback:v=>N(v)}}}}});
-}
-
-function buildCash(fin, bud, cash, bill, kpi) {
-  document.getElementById('cashHead').innerHTML=makeHead9('200px');
-  const mBillA=bill.b[CURRENT]||0, mCollA=bill.c[CURRENT]||0;
-  const qBillA=bill.bS(QTD), qCollA=bill.cS(QTD);
-  const yBillA=bill.bS(YTD), yCollA=bill.cS(YTD);
-  const mRevB=bud.revTotal([CURRENT]), qRevB=bud.revTotal(QTD), yRevB=bud.revTotal(YTD);
-  const mCash=cash.get(CURRENT), mBurn=cash.burn(CURRENT);
-  const qBurn=mCash-cash.get('2026-04-30'); // QTD: change since start of Q2 (Apr 30)
-  const yBurn=mCash-cash.get(BOP_DT);    // YTD: change since Jan 31
-  const mBurnB  = kpi.eop('Adjusted_CF', CURRENT)/1e3;
-  const qBurnB  = kpi.flow('Adjusted_CF', QTD)/1e3;
-  const yBurnB  = kpi.flow('Adjusted_CF', YTD)/1e3;
-  const mCashB  = kpi.eop('Cash_EOP', CURRENT)/1e3;
-  let h='';
-  h+=row9('Billings',mBillA/1e3,mRevB/1e3,qBillA/1e3,qRevB/1e3,yBillA/1e3,yRevB/1e3,{varDir:1});
-  const mCollB = -kpi.eop('BillCollect.Collections', CURRENT)/1e3;
-  const qCollB = -kpi.flow('BillCollect.Collections', QTD)/1e3;
-  const yCollB = -kpi.flow('BillCollect.Collections', YTD)/1e3;
-  h+=row9('Collections',mCollA/1e3,mCollB||null,qCollA/1e3,qCollB||null,yCollA/1e3,yCollB||null,{varDir:1});
-  h+=spacer();
-  h+=row9('Ending Cash',mCash/1e3,mCashB||null,mCash/1e3,mCashB||null,mCash/1e3,mCashB||null,{cls:'row-total',varDir:1,fmtFn:KD});
-  h+=row9('Cash Burn (MoM)',mBurn/1e3,mBurnB||null,qBurn/1e3,qBurnB||null,yBurn/1e3,yBurnB||null,{varDir:1});
-  document.getElementById('cashBody').innerHTML=h;
-  const burnLabels=['Feb-26','Mar-26','Apr-26','May-26','Jun-26'];
-  const burnDates=['2026-02-28','2026-03-31','2026-04-30','2026-05-31','2026-06-30'];
-  // YTD actuals: cumulative cash change since BOP (Jan 31)
-  const burnAct=burnDates.map(dt=>(cash.get(dt)-cash.get(BOP_DT))/1e3);
-  // YTD budget: sum of Adjusted_CF through each month
-  const ytdSlices=[
-    ['2026-02-28'],
-    ['2026-02-28','2026-03-31'],
-    ['2026-02-28','2026-03-31','2026-04-30'],
-    ['2026-02-28','2026-03-31','2026-04-30','2026-05-31'],
-    ['2026-02-28','2026-03-31','2026-04-30','2026-05-31','2026-06-30']
-  ];
-  const burnBud=ytdSlices.map(dts=>kpi.flow('Adjusted_CF',dts)/1e3);
-  new Chart(document.getElementById('cashMonthlyChart'),{type:'line',data:{labels:burnLabels,datasets:[
-    {label:'Budget',data:burnBud,borderColor:'rgba(233,255,95,0.8)',backgroundColor:'rgba(233,255,95,0.2)',fill:'origin',borderWidth:1.5,borderDash:[5,4],tension:0.3,pointRadius:3,pointBackgroundColor:'rgba(233,255,95,0.9)'},
-    {label:'Actuals',data:burnAct,borderColor:BRAND.teal,backgroundColor:'transparent',fill:false,borderWidth:2.5,tension:0.3,pointBackgroundColor:BRAND.teal,pointBorderColor:'#fff',pointBorderWidth:2,pointRadius:5}
-  ]},options:{responsive:true,layout:{padding:{top:20}},plugins:{legend:{position:'top'},tooltip:{mode:'index',intersect:false}},scales:{x:{grid:{display:false}},y:{grid:{color:'#f1f5f9'},ticks:{callback:v=>N(v)}}}}});
-}
-
-function buildSvcPL(fin, bud) {
-  document.getElementById('svcHead').innerHTML=makeHead9('240px');
-  const svcRevA=(mths)=>fin.revSum(mths,'Services Revenue'), svcRevB=(mths)=>bud.revSum(mths,'Services Revenue');
-  const svcExpA=(mths)=>fin.expSum(mths,'COGS: Services','',''), svcExpB=(mths)=>bud.expSum(mths,'COGS: Services','','');
-  const CATS=['Employee Compensation & Benefits','Contract Labor','Travel','SaaS Tooling','Facilities','Administrative'];
-  let h='';
-  h+=secRow('Revenue');
-  h+=row9('Services Revenue',svcRevA([CURRENT])/1e3,svcRevB([CURRENT])/1e3,svcRevA(QTD)/1e3,svcRevB(QTD)/1e3,svcRevA(YTD)/1e3,svcRevB(YTD)/1e3,{varDir:1});
-  h+=spacer();
-  h+=secRow('Cost of Services');
-  for(const cat of CATS){
-    const mA=fin.expDeptCatSum([CURRENT],'COGS: Services',cat),mB=bud.expDeptCatSum([CURRENT],'COGS: Services',cat);
-    const qA=fin.expDeptCatSum(QTD,'COGS: Services',cat),qB=bud.expDeptCatSum(QTD,'COGS: Services',cat);
-    const yA=fin.expDeptCatSum(YTD,'COGS: Services',cat),yB=bud.expDeptCatSum(YTD,'COGS: Services',cat);
-    if(Math.abs(mA)+Math.abs(mB)+Math.abs(qA)+Math.abs(qB)>100)h+=row9(cat,mA/1e3,mB/1e3,qA/1e3,qB/1e3,yA/1e3,yB/1e3,{varDir:-1});
-  }
-  const mExpA=svcExpA([CURRENT]),mExpB=svcExpB([CURRENT]),qExpA=svcExpA(QTD),qExpB=svcExpB(QTD);
-  const yExpA=svcExpA(YTD),yExpB=svcExpB(YTD);
-  h+=row9('Total Cost of Services',mExpA/1e3,mExpB/1e3,qExpA/1e3,qExpB/1e3,yExpA/1e3,yExpB/1e3,{cls:'row-subtotal',varDir:-1,fmtFn:KD});
-  h+=spacer();
-  h+=secRow('Margin');
-  const mGPA=svcRevA([CURRENT])-mExpA, mGPB=svcRevB([CURRENT])-mExpB;
-  const qGPA=svcRevA(QTD)-qExpA, qGPB=svcRevB(QTD)-qExpB;
-  const yGPA=svcRevA(YTD)-yExpA, yGPB=svcRevB(YTD)-yExpB;
-  h+=row9('Services Gross Profit',mGPA/1e3,mGPB/1e3,qGPA/1e3,qGPB/1e3,yGPA/1e3,yGPB/1e3,{cls:'row-subtotal',varDir:1,fmtFn:KD});
-  const mGMa=svcRevA([CURRENT])?mGPA/svcRevA([CURRENT]):0, mGMb=svcRevB([CURRENT])?mGPB/svcRevB([CURRENT]):0;
-  const qGMa=svcRevA(QTD)?qGPA/svcRevA(QTD):0,   qGMb=svcRevB(QTD)?qGPB/svcRevB(QTD):0;
-  const yGMa=svcRevA(YTD)?yGPA/svcRevA(YTD):0,   yGMb=svcRevB(YTD)?yGPB/svcRevB(YTD):0;
-  h+=rowPct('Services GM%',mGMa,mGMb,qGMa,qGMb,yGMa,yGMb,{cls:'row-margin',varDir:1});
-  document.getElementById('svcBody').innerHTML=h;
-}
-
-// Module-level refs so the expense filter can trigger a rebuild
-let _expFin = null, _expBud = null, _expChartInst = null;
-function rebuildExpense() {
-  if (!_expFin) return;
-  const dept = document.getElementById('expDeptSelect').value;
-  buildExpense(_expFin, _expBud, dept);
-}
-
-function buildExpense(fin, bud, deptFilter='') {
-  _expFin = fin; _expBud = bud;
-  document.getElementById('expHead').innerHTML=makeHead9('240px');
-  const EXP_CATS=['Employee Compensation & Benefits','Contract Labor','Professional Services','Hosting Fees','SaaS Tooling','Discretionary Marketing','Travel','Facilities','Administrative'];
-  // Use dept-level aggregation when filtered, company-wide when not
-  const catA = (mths,cat) => deptFilter ? fin.expDeptCatSum(mths,deptFilter,cat) : fin.expCatSum(mths,cat);
-  const catB = (mths,cat) => deptFilter ? bud.expDeptCatSum(mths,deptFilter,cat) : bud.expCatSum(mths,cat);
-  const mRevA=fin.revTotal([CURRENT]),mRevB=bud.revTotal([CURRENT]);
-  const qRevA=fin.revTotal(QTD),qRevB=bud.revTotal(QTD);
-  const yRevA=fin.revTotal(YTD),yRevB=bud.revTotal(YTD);
-  let h='';
-  h+=row9('Total Revenue',mRevA/1e3,mRevB/1e3,qRevA/1e3,qRevB/1e3,yRevA/1e3,yRevB/1e3,{cls:'row-subtotal',varDir:1,fmtFn:KD});
-  h+=spacer();
-  let mExpTA=0,mExpTB=0,qExpTA=0,qExpTB=0,yExpTA=0,yExpTB=0;
-  const catRows=[];
-  for(const cat of EXP_CATS){
-    const mA=catA([CURRENT],cat),mB=catB([CURRENT],cat);
-    const qA=catA(QTD,cat),qB=catB(QTD,cat);
-    const yA=catA(YTD,cat),yB=catB(YTD,cat);
-    mExpTA+=mA;mExpTB+=mB;qExpTA+=qA;qExpTB+=qB;yExpTA+=yA;yExpTB+=yB;
-    catRows.push({cat,mA,mB,qA,qB,yA,yB});
-    h+=row9(cat,mA/1e3,mB/1e3,qA/1e3,qB/1e3,yA/1e3,yB/1e3,{varDir:-1});
-  }
-  h+=row9('Total Expense',mExpTA/1e3,mExpTB/1e3,qExpTA/1e3,qExpTB/1e3,yExpTA/1e3,yExpTB/1e3,{cls:'row-subtotal',varDir:-1,fmtFn:KD});
-  // Only show EBITDA when viewing all departments (dept-level has no revenue attribution)
-  if(!deptFilter){
-    h+=spacer();
-    const mEbitdaA=mRevA-mExpTA,mEbitdaB=mRevB-mExpTB;
-    const qEbitdaA=qRevA-qExpTA,qEbitdaB=qRevB-qExpTB;
-    const yEbitdaA=yRevA-yExpTA,yEbitdaB=yRevB-yExpTB;
-    h+=row9('EBITDA',mEbitdaA/1e3,mEbitdaB/1e3,qEbitdaA/1e3,qEbitdaB/1e3,yEbitdaA/1e3,yEbitdaB/1e3,{cls:'row-total',varDir:1,fmtFn:KD});
-    const mEMa=mRevA?mEbitdaA/mRevA:0,mEMb=mRevB?mEbitdaB/mRevB:0;
-    const qEMa=qRevA?qEbitdaA/qRevA:0,qEMb=qRevB?qEbitdaB/qRevB:0;
-    const yEMa=yRevA?yEbitdaA/yRevA:0,yEMb=yRevB?yEbitdaB/yRevB:0;
-    h+=rowPct('EBITDA Margin %',mEMa,mEMb,qEMa,qEMb,yEMa,yEMb,{cls:'row-margin',varDir:1});
-  }
-  document.getElementById('expBody').innerHTML=h;
-  // Rebuild chart — destroy previous instance first
-  if(_expChartInst){_expChartInst.destroy();_expChartInst=null;}
-  const sorted=catRows.filter(c=>c.yA||c.yB).sort((a,b)=>b.yA-a.yA);
-  const lbl=sorted.map(c=>c.cat.replace('Employee Compensation & Benefits','Emp C&B').replace('Discretionary Marketing','Disc. Mktg').replace('Professional Services','Prof. Svcs'));
-  _expChartInst=new Chart(document.getElementById('expCatChart'),{type:'bar',data:{labels:lbl,datasets:[{label:'Actuals',data:sorted.map(c=>c.yA/1e3),backgroundColor:C_ACT,borderRadius:3},{label:'Budget',data:sorted.map(c=>c.yB/1e3),backgroundColor:C_BUD,borderRadius:3}]},options:{indexAxis:'y',responsive:true,layout:{padding:{right:50}},plugins:{legend:{position:'top'}},scales:{x:{grid:{color:'#f1f5f9'},ticks:{callback:v=>N(v)}},y:{grid:{display:false},ticks:{font:{size:10}}}}}});
-}
-
-function buildDept(fin, bud) {
-  document.getElementById('deptHead').innerHTML=makeHead9('220px');
-  const COGS=['COGS: Infrastructure','COGS: Services'];
-  const OPEX=['Engineering','Product','Customer Success','Sales','Marketing','G&A'];
-  const mRevA=fin.revTotal([CURRENT]),mRevB=bud.revTotal([CURRENT]);
-  const qRevA=fin.revTotal(QTD),qRevB=bud.revTotal(QTD);
-  const yRevA=fin.revTotal(YTD),yRevB=bud.revTotal(YTD);
-  let h='';
-  h+=row9('Total Revenue',mRevA/1e3,mRevB/1e3,qRevA/1e3,qRevB/1e3,yRevA/1e3,yRevB/1e3,{cls:'row-subtotal',varDir:1,fmtFn:KD});
-  h+=spacer();
-  let mCogsA=0,mCogsB=0,qCogsA=0,qCogsB=0,yCogsA=0,yCogsB=0;
-  for(const dept of COGS){
-    h+=secRow(dept);
-    for(const cls of ['Headcount Costs','Non-Headcount Costs','Overhead']){
-      const mA=fin.expSum([CURRENT],dept,cls,''),mB=bud.expSum([CURRENT],dept,cls,'');
-      const qA=fin.expSum(QTD,dept,cls,''),qB=bud.expSum(QTD,dept,cls,'');
-      const yA=fin.expSum(YTD,dept,cls,''),yB=bud.expSum(YTD,dept,cls,'');
-      if(Math.abs(mA)+Math.abs(mB)+Math.abs(qA)+Math.abs(qB)>100)h+=row9(cls,mA/1e3,mB/1e3,qA/1e3,qB/1e3,yA/1e3,yB/1e3,{lc:'label-indent',varDir:-1});
-    }
-    const mA=fin.expSum([CURRENT],dept,'',''),mB=bud.expSum([CURRENT],dept,'','');
-    const qA=fin.expSum(QTD,dept,'',''),qB=bud.expSum(QTD,dept,'','');
-    const yA=fin.expSum(YTD,dept,'',''),yB=bud.expSum(YTD,dept,'','');
-    mCogsA+=mA;mCogsB+=mB;qCogsA+=qA;qCogsB+=qB;yCogsA+=yA;yCogsB+=yB;
-    h+=row9('Total '+dept,mA/1e3,mB/1e3,qA/1e3,qB/1e3,yA/1e3,yB/1e3,{cls:'row-subtotal',varDir:-1,fmtFn:KD});
-    h+=spacer();
-  }
-  h+=row9('Total COGS',mCogsA/1e3,mCogsB/1e3,qCogsA/1e3,qCogsB/1e3,yCogsA/1e3,yCogsB/1e3,{cls:'row-total',varDir:-1,fmtFn:KD});
-  const mGPA=mRevA-mCogsA,mGPB=mRevB-mCogsB,qGPA=qRevA-qCogsA,qGPB=qRevB-qCogsB;
-  const yGPA=yRevA-yCogsA,yGPB=yRevB-yCogsB;
-  h+=row9('Gross Profit',mGPA/1e3,mGPB/1e3,qGPA/1e3,qGPB/1e3,yGPA/1e3,yGPB/1e3,{cls:'row-subtotal',varDir:1,fmtFn:KD});
-  h+=rowPct('GM%',mRevA?mGPA/mRevA:0,mRevB?mGPB/mRevB:0,qRevA?qGPA/qRevA:0,qRevB?qGPB/qRevB:0,yRevA?yGPA/yRevA:0,yRevB?yGPB/yRevB:0,{cls:'row-margin',varDir:1});
-  h+=spacer();
-  let mOpexA=0,mOpexB=0,qOpexA=0,qOpexB=0,yOpexA=0,yOpexB=0;
-  for(const dept of OPEX){
-    h+=secRow(dept);
-    for(const cls of ['Headcount Costs','Non-Headcount Costs','Overhead']){
-      const mA=fin.expSum([CURRENT],dept,cls,''),mB=bud.expSum([CURRENT],dept,cls,'');
-      const qA=fin.expSum(QTD,dept,cls,''),qB=bud.expSum(QTD,dept,cls,'');
-      const yA=fin.expSum(YTD,dept,cls,''),yB=bud.expSum(YTD,dept,cls,'');
-      if(Math.abs(mA)+Math.abs(mB)+Math.abs(qA)+Math.abs(qB)>100)h+=row9(cls,mA/1e3,mB/1e3,qA/1e3,qB/1e3,yA/1e3,yB/1e3,{lc:'label-indent',varDir:-1});
-    }
-    const mA=fin.expSum([CURRENT],dept,'',''),mB=bud.expSum([CURRENT],dept,'','');
-    const qA=fin.expSum(QTD,dept,'',''),qB=bud.expSum(QTD,dept,'','');
-    const yA=fin.expSum(YTD,dept,'',''),yB=bud.expSum(YTD,dept,'','');
-    mOpexA+=mA;mOpexB+=mB;qOpexA+=qA;qOpexB+=qB;yOpexA+=yA;yOpexB+=yB;
-    h+=row9('Total '+dept,mA/1e3,mB/1e3,qA/1e3,qB/1e3,yA/1e3,yB/1e3,{cls:'row-subtotal',varDir:-1,fmtFn:KD});
-    h+=spacer();
-  }
-  h+=row9('Total OpEx',mOpexA/1e3,mOpexB/1e3,qOpexA/1e3,qOpexB/1e3,yOpexA/1e3,yOpexB/1e3,{cls:'row-total',varDir:-1,fmtFn:KD});
-  h+=spacer();
-  const mEA=mGPA-mOpexA,mEB=mGPB-mOpexB,qEA=qGPA-qOpexA,qEB=qGPB-qOpexB;
-  const yEA=yGPA-yOpexA,yEB=yGPB-yOpexB;
-  h+=row9('EBITDA',mEA/1e3,mEB/1e3,qEA/1e3,qEB/1e3,yEA/1e3,yEB/1e3,{cls:'row-total',varDir:1,fmtFn:KD});
-  h+=spacer();
-  h+=secRow('Cost Summary');
-  const ALL_DEPTS=[...COGS,...OPEX];
-  const mHCA=ALL_DEPTS.reduce((s,d)=>s+fin.expSum([CURRENT],d,'Headcount Costs',''),0);
-  const mHCB=ALL_DEPTS.reduce((s,d)=>s+bud.expSum([CURRENT],d,'Headcount Costs',''),0);
-  const qHCA=ALL_DEPTS.reduce((s,d)=>s+fin.expSum(QTD,d,'Headcount Costs',''),0);
-  const qHCB=ALL_DEPTS.reduce((s,d)=>s+bud.expSum(QTD,d,'Headcount Costs',''),0);
-  const yHCA=ALL_DEPTS.reduce((s,d)=>s+fin.expSum(YTD,d,'Headcount Costs',''),0);
-  const yHCB=ALL_DEPTS.reduce((s,d)=>s+bud.expSum(YTD,d,'Headcount Costs',''),0);
-  h+=row9('Headcount Costs',mHCA/1e3,mHCB/1e3,qHCA/1e3,qHCB/1e3,yHCA/1e3,yHCB/1e3,{cls:'row-subtotal',varDir:-1,fmtFn:KD});
-  const mNHCA=ALL_DEPTS.reduce((s,d)=>s+fin.expSum([CURRENT],d,'Non-Headcount Costs',''),0);
-  const mNHCB=ALL_DEPTS.reduce((s,d)=>s+bud.expSum([CURRENT],d,'Non-Headcount Costs',''),0);
-  const qNHCA=ALL_DEPTS.reduce((s,d)=>s+fin.expSum(QTD,d,'Non-Headcount Costs',''),0);
-  const qNHCB=ALL_DEPTS.reduce((s,d)=>s+bud.expSum(QTD,d,'Non-Headcount Costs',''),0);
-  const yNHCA=ALL_DEPTS.reduce((s,d)=>s+fin.expSum(YTD,d,'Non-Headcount Costs',''),0);
-  const yNHCB=ALL_DEPTS.reduce((s,d)=>s+bud.expSum(YTD,d,'Non-Headcount Costs',''),0);
-  h+=row9('Non-Headcount Costs',mNHCA/1e3,mNHCB/1e3,qNHCA/1e3,qNHCB/1e3,yNHCA/1e3,yNHCB/1e3,{cls:'row-subtotal',varDir:-1,fmtFn:KD});
-  document.getElementById('deptBody').innerHTML=h;
-}
-
-function buildHeadcount(hc, kpi, hcdb) {
-  const hcB   = Math.round(kpi.eop('Total_HC_EOM', CURRENT));
-  const hcVar = hcB ? hc.totJun - hcB : null;
-  const hcVc  = hcVar==null?'var-flat':hcVar<0?'var-good':'var-bad';
-  const hcVs  = hcVar==null?'—':(hcVar>0?'+':'')+hcVar;
-  document.getElementById('hcHead').innerHTML=`<tr class="col-header">
-    <th class="label-col" style="width:200px">Department</th>
-    <th>Apr</th><th>May</th>
-    <th class="col-m">Jun (Actuals)</th>
-    <th class="col-mb">Jun Budget</th>
-    <th class="col-mv">Variance</th>
-  </tr>`;
-  let h='';
-  h+=`<tr class="row-section"><td class="label-col" colspan="6">By Department</td></tr>`;
-  for(const d of hc.DEPTS){
-    const dd=hc.byDept[d]||{apr:0,may:0,jun:0};
-    const bv=(hcdb&&hcdb[d]!=null)?hcdb[d]:null;
-    const vv=bv!=null?dd.jun-bv:null;
-    const vc=vv==null?'var-flat':vv<0?'var-good':'var-bad';
-    const vs=vv==null?'—':(vv>0?'+':'')+vv;
-    h+=`<tr><td class="label-col">${d}</td><td>${dd.apr}</td><td>${dd.may}</td><td class="col-m">${dd.jun}</td><td class="col-mb">${bv??'—'}</td><td class="col-mv ${vc}">${vs}</td></tr>`;
-  }
-  h+=`<tr class="row-total"><td class="label-col">Total</td><td>${hc.totApr}</td><td>${hc.totMay}</td><td class="col-m">${hc.totJun}</td><td class="col-mb">${hcB||'—'}</td><td class="col-mv ${hcVc}">${hcVs}</td></tr>`;
-  document.getElementById('hcBody').innerHTML=h;
-  drawWF('hcBridgeChart',['BOP (May)','+Hires','−Voluntary','−Involuntary','EOP (Jun)'],[{t:'start',v:hc.totMay,c:BRAND.lime},{t:'inc',v:hc.hires},{t:'dec',v:hc.vol},{t:'dec',v:hc.inv},{t:'end',v:hc.totJun}],{yMin:Math.max(0,hc.totJun-20),yMax:hc.totMay+10});
-  drawBar('hcDeptChart',hc.DEPTS.map(d=>d.replace('COGS: ','').replace('Customer Success','CS')),[{label:'Jun',data:hc.DEPTS.map(d=>(hc.byDept[d]||{jun:0}).jun),backgroundColor:C_ACT,borderRadius:3}],{formatter:v=>v.toString()});
-}
-
-function buildQS(fin, bud, arr, cash, bill, hc, kpi) {
-  const qRevA=fin.revTotal(YTD),qRevB=bud.revTotal(YTD);
-  const qSaaSA=fin.revSum(YTD,'Subscription Revenue')+fin.revSum(YTD,'Consumption Revenue');
-  const qSaaSB=bud.revSum(YTD,'Subscription Revenue')+bud.revSum(YTD,'Consumption Revenue');
-  const qSvcRA=fin.revSum(YTD,'Services Revenue'),qSvcRB=bud.revSum(YTD,'Services Revenue');
-  const COGS=['COGS: Infrastructure','COGS: Services'];
-  const qCogsA=COGS.reduce((s,d)=>s+fin.expSum(YTD,d,'',''),0);
-  const qCogsB=COGS.reduce((s,d)=>s+bud.expSum(YTD,d,'',''),0);
-  const qSaasCOGSA=fin.expSum(YTD,'COGS: Infrastructure','',''),qSaasCOGSB=bud.expSum(YTD,'COGS: Infrastructure','','');
-  const qSvcCA=fin.expSum(YTD,'COGS: Services','',''),qSvcCB=bud.expSum(YTD,'COGS: Services','','');
-  const qGPA=qRevA-qCogsA,qGPB=qRevB-qCogsB;
-  const OPEX=['Engineering','Product','Customer Success','Sales','Marketing','G&A'];
-  const qOpexA=OPEX.reduce((s,d)=>s+fin.expSum(YTD,d,'',''),0);
-  const qOpexB=OPEX.reduce((s,d)=>s+bud.expSum(YTD,d,'',''),0);
-  const qEbitdaA=qGPA-qOpexA,qEbitdaB=qGPB-qOpexB;
-  const bopFY=arr.bop('2026-02-28'),eopA=arr.get(CURRENT).carArr;
-  const qChurn=YTD.reduce((s,dt)=>s+arr.get(dt).churn,0),qExpArr=YTD.reduce((s,dt)=>s+arr.get(dt).expArr,0);
-  const ndrQ=bopFY>0?(bopFY+qChurn+qExpArr)/bopFY:0;
-  const endCash=cash.get(CURRENT),qBurn=endCash-cash.get(BOP_DT);
-  const qBillA=bill.bS(YTD);
-  // KPI budgets for QS
-  const qNewArrB  = kpi.flow('KPI.NewARR',        YTD);
-  const qExpArrB  = kpi.flow('KPI.ExpansionARR',  YTD);
-  const qChnArrB  = kpi.flow('KPI.Downsell_Churn',YTD);
-  const qEopArrB  = kpi.eop('KPI.Exiting_ARR',   CURRENT);
-  const qCashBurnB= kpi.flow('Adjusted_CF',       YTD);
-  const qCashEopB = kpi.eop('Cash_EOP',           CURRENT);
-  const hcBudget  = Math.round(kpi.eop('Total_HC_EOM', CURRENT));
-  const gmA=qRevA?qGPA/qRevA:0,gmB=qRevB?qGPB/qRevB:0;
-  const saasGmA=qSaaSA?(qSaaSA-qSaasCOGSA)/qSaaSA:0,saasGmB=qSaaSB?(qSaaSB-qSaasCOGSB)/qSaaSB:0;
-  const svcGmA=qSvcRA?(qSvcRA-qSvcCA)/qSvcRA:0,svcGmB=qSvcRB?(qSvcRB-qSvcCB)/qSvcRB:0;
-  const ebitdaMrgA=qRevA?qEbitdaA/qRevA:0,ebitdaMrgB=qRevB?qEbitdaB/qRevB:0;
-
-  // Left bullets
-  const f=v=>{ if(v==null)return'—'; const n=Math.round(Math.abs(v)/1e3); return (v<0?'-$':'$')+N(n)+'K'; };
-  const vc2=(a,b)=>a>b?'good':'bad';
-  document.getElementById('qsLeft').innerHTML=`
-    <div class="sl-group"><div class="sl-group-label">ARR &amp; Bookings</div>
-      <div class="sl-kpi"><p>EOP ARR = <strong>${f(eopA)}</strong></p></div>
-      <div class="sl-kpi"><p>Billings = <strong>${f(qBillA)}</strong></p></div>
-      <div class="sl-kpi"><p>N$R YTD = <strong class="${ndrQ>=0.99?'good':'bad'}">${PCT(ndrQ)}</strong></p></div>
-    </div>
-    <div class="sl-group"><div class="sl-group-label">Revenue &amp; Margin</div>
-      <div class="sl-kpi"><p>Revenue = <strong>${f(qRevA)}</strong> <em>vs ${f(qRevB)} plan</em></p></div>
-      <div class="sl-kpi"><p>GM% = <strong>${PCT(gmA)}</strong> <em>vs ${PCT(gmB)} plan · <span class="${gmA>=gmB?'good':'bad'}">${PP((gmA-gmB)*100)}</span></em></p></div>
-      <div class="sl-kpi"><p>SaaS GM% = <strong>${PCT(saasGmA)}</strong> <em>vs ${PCT(saasGmB)} plan · <span class="${saasGmA>=saasGmB?'good':'bad'}">${PP((saasGmA-saasGmB)*100)}</span></em></p></div>
-      <div class="sl-kpi"><p>Svcs GM% = <strong class="${svcGmA>=0?'':'bad'}">${PCT(svcGmA)}</strong> <em>vs ${PCT(svcGmB)} plan · <span class="${svcGmA>=svcGmB?'good':'bad'}">${PP((svcGmA-svcGmB)*100)}</span></em></p></div>
-      <div class="sl-kpi"><p>EBITDA = <strong>${f(qEbitdaA)}</strong> <em>(${PCT(ebitdaMrgA)} vs ${PCT(ebitdaMrgB)} plan · <span class="${ebitdaMrgA>=ebitdaMrgB?'good':'bad'}">${PP((ebitdaMrgA-ebitdaMrgB)*100)}</span>)</em></p></div>
-    </div>
-    <div class="sl-group"><div class="sl-group-label">People &amp; Cash</div>
-      <div class="sl-kpi"><p>Headcount EoQ = <strong>${hc.totJun}</strong></p></div>
-      <div class="sl-kpi"><p>Cash Burn YTD = <strong class="${qBurn>=0?'good':'bad'}">${f(qBurn)}</strong></p></div>
-      <div class="sl-kpi"><p>Ending Cash = <strong class="good">${f(endCash)}</strong></p></div>
-    </div>`;
-
-  // Right table
-  const M=(v)=>{ if(v==null)return''; const n=Math.round(Math.abs(v)/1e3); return (v<0?'-$':'$')+N(n)+'K'; };
-  const Mv=(a,b)=>{ if(a==null||b==null)return''; const v=a-b; return (v>=0?'+$':'-$')+N(Math.round(Math.abs(v)/1e3))+'K'; };
-  const Mpct=(a,b)=>{if(!b)return'';const v=(a-b)/Math.abs(b);return(v>=0?'+':'-')+(Math.abs(v)*100).toFixed(1)+'%';};
-  const vgb=(a,b,rev=true)=>a==null||b==null?'vn':(((a-b)>0.001*Math.abs(b||1))?( rev?'vg':'vb'):((a-b)<-0.001*Math.abs(b||1))?(rev?'vb':'vg'):'vn');
-  function slRow(lbl,bv,av,opts={}){
-    const{cls='',ind=false,isPP=false,budStr=null,actStr=null,varStr=null,pctStr=null}=opts;
-    if(cls==='sr')return `<tr class="sr"><td class="sl-l" colspan="5">${lbl}</td></tr>`;
-    if(cls==='sp')return `<tr class="sp"><td colspan="5"></td></tr>`;
-    const lc=ind?'sl-li':'sl-l';
-    const bs=budStr!==null?budStr:M(bv);
-    const as=actStr!==null?actStr:M(av);
-    const vs=varStr!==null?varStr:(bv!=null&&av!=null?Mv(av,bv):'');
-    const ps=pctStr!==null?pctStr:(isPP?PP(av&&bv?av-bv:null):bv?Mpct(av,bv):'');
-    const vc3=vgb(av,bv,opts.rev!==false);
-    return`<tr class="${cls}"><td class="${lc}">${lbl}</td><td>${bs}</td><td class="act-col">${as}</td><td class="${vc3}">${vs}</td><td class="${vc3}">${ps}</td></tr>`;
-  }
-  const bopArrA=bopFY, bopArrB=kpi.bopFY()||null;
-  let qs='';
-  qs+=slRow('ARR',null,null,{cls:'sr'});
-  qs+=slRow('BOP ARR',bopArrB||null,bopArrA||null,{rev:true});
-  qs+=slRow('Bookings (New+Exp)',qNewArrB+qExpArrB,YTD.reduce((s,dt)=>s+arr.get(dt).newArr+arr.get(dt).expArr,0),{ind:true,rev:true});
-  qs+=slRow('Churn',qChnArrB,YTD.reduce((s,dt)=>s+arr.get(dt).churn,0),{ind:true,rev:false});
-  qs+=slRow('EOP ARR',qEopArrB,eopA,{cls:'st',rev:true});
-  qs+=slRow('',null,null,{cls:'sp'});
-  qs+=slRow('Revenue',null,null,{cls:'sr'});
-  qs+=slRow('SaaS',qSaaSB,qSaaSA,{ind:true,rev:true});
-  qs+=slRow('Services',qSvcRB,qSvcRA,{ind:true,rev:true});
-  qs+=slRow('Total',qRevB,qRevA,{cls:'st',rev:true});
-  qs+=slRow('',null,null,{cls:'sp'});
-  qs+=slRow('COGS',null,null,{cls:'sr'});
-  qs+=slRow('SaaS COGS',qSaasCOGSB,qSaasCOGSA,{ind:true,rev:false});
-  qs+=slRow('Services COGS',qSvcCB,qSvcCA,{ind:true,rev:false});
-  qs+=slRow('Total COGS',qCogsB,qCogsA,{cls:'st',rev:false});
-  qs+=slRow('',null,null,{cls:'sp'});
-  qs+=slRow('Gross Profit',qGPB,qGPA,{cls:'st',rev:true});
-  qs+=slRow('GM%',gmB,gmA,{cls:'sm',isPP:true,rev:true,budStr:PCT(gmB),actStr:PCT(gmA),varStr:PP((gmA-gmB)*100),pctStr:''});
-  qs+=slRow('SaaS GM%',saasGmB,saasGmA,{cls:'sm',isPP:true,rev:true,budStr:PCT(saasGmB),actStr:PCT(saasGmA),varStr:PP((saasGmA-saasGmB)*100),pctStr:''});
-  qs+=slRow('Services GM%',svcGmB,svcGmA,{cls:'sm',isPP:true,rev:true,budStr:PCT(svcGmB),actStr:PCT(svcGmA),varStr:PP((svcGmA-svcGmB)*100),pctStr:''});
-  qs+=slRow('',null,null,{cls:'sp'});
-  qs+=slRow('Total OpEx',qOpexB,qOpexA,{cls:'st',rev:false});
-  qs+=slRow('',null,null,{cls:'sp'});
-  qs+=slRow('EBITDA',qEbitdaB,qEbitdaA,{cls:'st',rev:true});
-  qs+=slRow('EBITDA%',ebitdaMrgB,ebitdaMrgA,{cls:'sm',isPP:true,rev:true,budStr:PCT(ebitdaMrgB),actStr:PCT(ebitdaMrgA),varStr:PP((ebitdaMrgA-ebitdaMrgB)*100),pctStr:''});
-  qs+=slRow('',null,null,{cls:'sp'});
-  qs+=slRow('Cash',null,null,{cls:'sr'});
-  qs+=slRow('Ending Cash',qCashEopB||null,endCash,{cls:'st',rev:true});
-  qs+=slRow('Cash Burn YTD',qCashBurnB||null,qBurn,{rev:true});
-  const hcQsVar=hcBudget?hc.totJun-hcBudget:null;
-  const hcQsVc=hcQsVar==null?'vn':hcQsVar<0?'vg':'vb';
-  const hcQsVs=hcQsVar==null?'—':(hcQsVar>0?'+':'')+hcQsVar;
-  qs+=`<tr><td class="sl-l">Headcount EoQ</td><td>${hcBudget||''}</td><td class="act-col">${hc.totJun}</td><td class="${hcQsVc}">${hcQsVs}</td><td></td></tr>`;
-  document.getElementById('qsBody').innerHTML=qs;
-}
-
-// ─── CUSTOMER ARR TAB ────────────────────────────────
-let custArrData = [];
-let custSortCol = 1, custSortAsc = false; // default: ARR desc
-let vertChartInst = null;
-
-const VERT_COLORS = ['#80C7D1','#FF9988','#a78bfa','#fb923c','#34d399','#f472b6','#60a5fa','#fbbf24','#CAEFEF','#6b7280','#e9ff5f','#f87171'];
-
-function buildVerticalPie(rows) {
-  const vm = {};
-  for (const r of rows) {
-    const v = r.VERTICAL || 'Unknown';
-    vm[v] = (vm[v] || 0) + +(r.ARR || 0);
-  }
-  const entries = Object.entries(vm).sort((a,b) => b[1]-a[1]);
-  const labels = entries.map(e => e[0]);
-  const data   = entries.map(e => Math.round(e[1]));
-  const total  = data.reduce((s,v) => s+v, 0);
-  const colors = labels.map((_,i) => VERT_COLORS[i % VERT_COLORS.length]);
-
-  if (vertChartInst) vertChartInst.destroy();
-  vertChartInst = new Chart(document.getElementById('vertPieChart'), {
-    type: 'doughnut',
-    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
-    options: {
-      responsive: true,
-      cutout: '60%',
-      plugins: {
-        legend: { position: 'right', labels: { boxWidth: 10, font: { size: 11 }, padding: 10 } },
-        tooltip: { callbacks: { label: ctx => ` $${N(Math.round(ctx.parsed/1e3))}K  (${(ctx.parsed/total*100).toFixed(1)}%)` } }
-      }
-    }
+function preProcessCustomerHealth(rows){
+  return rows.map(r => {
+    const pulseRaw = r.PULSE || '';
+    const score = pulseRaw ? parseInt(pulseRaw, 10) : null;
+    const curr = r.CURR_7D_AVG!=null ? +r.CURR_7D_AVG : null;
+    const prior = r.AVG_4WK_AVG!=null ? +r.AVG_4WK_AVG : null;
+    const variance = (curr!=null && prior) ? (curr-prior)/prior : null;
+    return {
+      name: r.CUSTOMER_NAME, arr: +(r.ARR||0), contractType: r.CONTRACT_TYPE,
+      contractStart: r.CONTRACT_START_DT||'', contractEnd: r.CONTRACT_END_DT||'',
+      vertical: r.VERTICAL||'', pulse: pulseRaw, pulseScore: (score!=null && !isNaN(score))?score:null,
+      currUsage: curr, priorUsage: prior, variance,
+    };
   });
 }
 
+function healthClass(score){
+  if(score==null) return 'unk';
+  if(score<=2) return 'red';
+  if(score===3) return 'yellow';
+  return 'green';
+}
+
+function healthDot(score){ return `<span class="health-dot health-${healthClass(score)}"></span>`; }
+
 function tagHtml(type) {
-  const cls = type==='Subscription'?'tag-sub':type==='Consumption'?'tag-con':type==='Both'?'tag-both':'tag-unk';
+  const cls = type==='Subscription'?'tag-sub':type==='Consumption'?'tag-con':'tag-unk';
   return `<span class="tag ${cls}">${type}</span>`;
+}
+
+function fmtDateShort(dt) {
+  if(!dt) return '<span style="color:#9ba3af">—</span>';
+  const d = new Date(dt);
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 }
 
 function fmtContractEnd(dt) {
@@ -1653,175 +482,305 @@ function fmtContractEnd(dt) {
   return label;
 }
 
-function buildCustomerARR(rows) {
-  custArrData = rows;
+// ─── BUILD ────────────────────────────────────────────
+function buildCards(deals, closed, tgt){
+  const fyDeals = deals.filter(isCurrentFY);
+  const openPipeFY = fyDeals.reduce((s,d)=>s+d.arr,0);
+  const allTimePipe = deals.reduce((s,d)=>s+d.arr,0);
+  const closedFYTD = Object.values(closed).reduce((s,r)=>s+r.total,0);
+  const annualQuota = Object.values(tgt.aeAnnual).reduce((s,v)=>s+v,0);
+  const remaining = annualQuota - closedFYTD;
+  const coverage = remaining>0 ? openPipeFY/remaining : null;
+  const late = deals.filter(d=>LATE_STAGES.has(d.stage));
+  const lateVal = late.reduce((s,d)=>s+d.arr,0);
 
-  // Populate vertical filter
-  const vertSet = new Set(rows.map(r=>r.VERTICAL).filter(v=>v));
-  const vertSel = document.getElementById('custVertFilter');
-  [...vertSet].sort().forEach(v => {
-    const o = document.createElement('option');
-    o.value = v; o.textContent = v;
-    vertSel.appendChild(o);
-  });
-
-  // Summary stats
-  const totalARR = rows.reduce((s,r)=>s+ +(r.ARR||0), 0);
-  document.getElementById('cs-total').textContent = rows.length;
-  document.getElementById('cs-arr').textContent = '$' + N(Math.round(totalARR/1e6),1) + 'M';
-  document.getElementById('cs-sub').textContent = rows.filter(r=>r.CONTRACT_TYPE==='Subscription').length;
-  document.getElementById('cs-con').textContent = rows.filter(r=>r.CONTRACT_TYPE==='Consumption').length;
-
-  buildVerticalPie(rows);
-  renderCustTable(rows);
-}
-
-function filterCustTable() {
-  const q = document.getElementById('custSearch').value.toLowerCase();
-  const type = document.getElementById('custTypeFilter').value;
-  const vert = document.getElementById('custVertFilter').value;
-  let filtered = custArrData.filter(r => {
-    if(q && !r.CUSTOMER_NAME.toLowerCase().includes(q)) return false;
-    if(type && r.CONTRACT_TYPE !== type) return false;
-    if(vert && r.VERTICAL !== vert) return false;
-    return true;
-  });
-  renderCustTable(filtered);
-}
-
-function sortCustTable(col) {
-  if(custSortCol === col) { custSortAsc = !custSortAsc; }
-  else { custSortCol = col; custSortAsc = col===0||col===1||col===3||col===4; } // text cols default asc
-  // re-apply current filter then sort
-  const q = document.getElementById('custSearch').value.toLowerCase();
-  const type = document.getElementById('custTypeFilter').value;
-  const vert = document.getElementById('custVertFilter').value;
-  let filtered = custArrData.filter(r => {
-    if(q && !r.CUSTOMER_NAME.toLowerCase().includes(q)) return false;
-    if(type && r.CONTRACT_TYPE !== type) return false;
-    if(vert && r.VERTICAL !== vert) return false;
-    return true;
-  });
-  renderCustTable(filtered);
-}
-
-function fmtScore(v) {
-  if(v==null||v==='') return '<span class="score-na">—</span>';
-  return '<span class="score-cell">' + Math.round(+v) + '</span>';
-}
-
-function renderCustTable(rows) {
-  // col order: 0=Customer, 1=Vertical, 2=ARR, 3=Type, 4=ContractEnd, 5=P, 6=A, 7=M, 8=E, 9=Overall
-  const getVal = (r,col) => [
-    r.CUSTOMER_NAME,
-    r.VERTICAL||'',
-    +(r.ARR||0),
-    r.CONTRACT_TYPE||'',
-    r.CONTRACT_END_DT||'',
-    +(r.P_SCORE||0),
-    +(r.A_SCORE||0),
-    +(r.M_SCORE||0),
-    +(r.E_SCORE||0),
-    +(r.OVERALL_SCORE||0)
-  ][col];
-  const sorted = [...rows].sort((a,b) => {
-    const av = getVal(a, custSortCol), bv = getVal(b, custSortCol);
-    if(typeof av==='number') return custSortAsc ? av-bv : bv-av;
-    return custSortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
-  });
-
-  // Update sort indicators
-  for(let i=0;i<10;i++){
-    const th=document.getElementById('cth'+i);
-    if(!th) continue;
-    th.className = custSortCol===i ? (custSortAsc?'sort-asc':'sort-desc') : '';
-    if(i===3) th.style.textAlign='center';
-    if(i===1) th.style.textAlign='left';
+  // reps below 3x coverage on their own remaining quota (FY-close pipe only)
+  const byRepFY = {};
+  for (const d of fyDeals) { byRepFY[d.owner] = (byRepFY[d.owner]||0) + d.arr; }
+  let below3x = 0, repsWithQuota = 0;
+  for (const name of tgt.aeNames) {
+    const rem = tgt.aeAnnual[name] - (closed[name]?.total||0);
+    if (rem <= 0) continue;
+    repsWithQuota++;
+    const cov = (byRepFY[name]||0) / rem;
+    if (cov < 3) below3x++;
   }
 
-  let h = '';
-  for(const r of sorted) {
-    const arrK = '$' + N(Math.round(+(r.ARR||0)/1e3));
-    const hc = r.HEALTH_COLOR || '';
-    const rowCls = hc ? 'health-'+hc : '';
-    h += `<tr class="${rowCls}">
-      <td title="${r.CUSTOMER_NAME}">${r.CUSTOMER_NAME}</td>
-      <td class="td-left">${r.VERTICAL||'<span class="score-na">—</span>'}</td>
-      <td>${arrK}K</td>
-      <td class="td-center">${tagHtml(r.CONTRACT_TYPE)}</td>
-      <td>${fmtContractEnd(r.CONTRACT_END_DT)}</td>
-      <td>${fmtScore(r.P_SCORE)}</td>
-      <td>${fmtScore(r.A_SCORE)}</td>
-      <td>${fmtScore(r.M_SCORE)}</td>
-      <td>${fmtScore(r.E_SCORE)}</td>
-      <td><strong>${fmtScore(r.OVERALL_SCORE)}</strong></td>
+  const cards = [
+    { label:'Open pipe (closing this FY)', value:K(openPipeFY), sub:`${fyDeals.length} deals, Stage 1+ · ${K(allTimePipe)} all-time` },
+    { label:'Closed-won FYTD', value:K(closedFYTD), sub:'Feb–Jun FY27' },
+    { label:'Company coverage', value: coverage!=null?coverage.toFixed(1)+'x':'—', sub:'FY open pipe ÷ (quota − closed)', cls: coverage!=null?(coverage>=3?'good':coverage<1.5?'warn':''):'' },
+    { label:'Late-stage value', value:K(lateVal), sub:`${late.length} deals in Selection/Negotiation` },
+    { label:'Reps under 3x coverage', value: `${below3x} / ${repsWithQuota}`, sub:'of reps with remaining quota', cls: below3x>repsWithQuota/2?'warn':'' },
+  ];
+  document.getElementById('cardsRow').innerHTML = cards.map(c=>`
+    <div class="stat-card ${c.cls||''}">
+      <div class="sc-label">${c.label}</div>
+      <div class="sc-value">${c.value}</div>
+      <div class="sc-sub">${c.sub}</div>
+    </div>`).join('');
+}
+
+function buildCoverage(deals, tgt){
+  const rows = QUARTERS.map(q => {
+    const pipe = deals.filter(d=>d.fq===q.fq).reduce((s,d)=>s+d.arr,0);
+    const quota = Object.values(tgt.aeQtr[q.fq]||{}).reduce((s,v)=>s+v,0);
+    const cov = quota>0 ? pipe/quota : null;
+    return { label:q.label, pipe, quota, cov };
+  });
+
+  new Chart(document.getElementById('coverageChart'), {
+    type: 'bar',
+    data: {
+      labels: rows.map(r=>r.label),
+      datasets: [
+        { label:'Open pipe (Stage 1+)', data: rows.map(r=>Math.round(r.pipe/1000)), backgroundColor: BRAND.teal, borderRadius: 3 },
+        { label:'Quota', data: rows.map(r=>Math.round(r.quota/1000)), backgroundColor: BRAND.black, borderRadius: 3 },
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top', labels:{boxWidth:12}}}, scales:{ x:{grid:{display:false}}, y:{grid:{color:'#f1f5f9'}, ticks:{callback:v=>'$'+v+'K'}} } }
+  });
+
+  let h = `<thead><tr><th class="th-lbl">Quarter</th><th>Open Pipe (S1+)</th><th>Quota</th><th>Coverage</th></tr></thead><tbody>`;
+  for (const r of rows) {
+    h += `<tr>
+      <td class="lbl">${r.label}</td>
+      <td>${K(r.pipe)}</td>
+      <td>${r.quota>0?K(r.quota):'—'}</td>
+      <td class="${covClass(r.cov)}">${r.cov!=null?r.cov.toFixed(1)+'x':'—'}</td>
     </tr>`;
   }
-  document.getElementById('custArrBody').innerHTML = h || '<tr><td colspan="10" style="color:#9ba3af;padding:16px">No matching customers.</td></tr>';
-  document.getElementById('custArrCount').textContent = `Showing ${sorted.length} of ${custArrData.length} customers`;
+  h += `</tbody>`;
+  document.getElementById('coverageTable').innerHTML = h;
 }
 
-// ─── CHART HELPERS ───────────────────────────────────
-function drawBar(canvasId, labels, datasets, opts={}) {
-  const {formatter=null}=opts;
-  new Chart(document.getElementById(canvasId),{type:'bar',data:{labels,datasets},options:{responsive:true,layout:{padding:{top:16}},plugins:{legend:{position:'top',labels:{boxWidth:12}},tooltip:{mode:'index',intersect:false}},scales:{x:{grid:{display:false}},y:{grid:{color:'#f1f5f9'},ticks:{callback:formatter||(v=>N(v))}}}}});
-}
-function drawWF(canvasId, labels, items, opts={}) {
-  const {yMin,yMax}=opts;
-  const fs=[]; let base=0;
-  for(const it of items){
-    if(it.t==='start'||it.t==='end'){fs.push({b:0,t:it.v,c:it.c||BRAND.black});base=it.v;}
-    else if(it.t==='inc'){fs.push({b:base,t:base+it.v,c:it.c||C_INC});base+=it.v;}
-    else{fs.push({b:base-it.v,t:base,c:it.c||C_DEC});base-=it.v;}
+function buildRepTable(deals, closed, tgt){
+  const byRep = {};
+  for (const d of deals) {
+    if (!byRep[d.owner]) byRep[d.owner] = { rvp: d.rvp, stages:{}, total:0, fyTotal:0 };
+    // Stage breakdown is all-time (regardless of close date) — matches the
+    // "All-Time Pipe" column. "Open Pipe (this FY)" is a separate FY27-only total.
+    byRep[d.owner].stages[d.stage] = (byRep[d.owner].stages[d.stage]||0) + d.arr;
+    byRep[d.owner].total += d.arr;
+    if (isCurrentFY(d)) byRep[d.owner].fyTotal += d.arr;
+    if (d.rvp) byRep[d.owner].rvp = d.rvp;
   }
-  new Chart(document.getElementById(canvasId),{type:'bar',data:{labels,datasets:[{data:fs.map(f=>[f.b,f.t]),backgroundColor:fs.map(f=>f.c),borderWidth:0,borderRadius:3}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{const[lo,hi]=ctx.raw;return lo===0?' '+N(hi):' '+(hi-lo>=0?'+':'−')+N(Math.abs(hi-lo));}}}},scales:{x:{grid:{display:false}},y:{grid:{color:'#f1f5f9'},min:yMin,max:yMax,ticks:{callback:v=>N(v)}}}}});
+  // union of every rep we know about from pipeline, closed actuals, or quota
+  const allReps = new Set([...Object.keys(byRep), ...Object.keys(closed), ...tgt.aeNames]);
+  const mgrGroups = {};
+  for (const rep of allReps) {
+    const mgr = byRep[rep]?.rvp || closed[rep]?.mgr || tgt.aeManager[rep] || 'Unassigned';
+    if (!mgrGroups[mgr]) mgrGroups[mgr] = [];
+    mgrGroups[mgr].push(rep);
+  }
+  const sortedMgrs = Object.keys(mgrGroups).sort((a,b) => {
+    const totA = mgrGroups[a].reduce((s,r)=>s+(byRep[r]?.total||0),0);
+    const totB = mgrGroups[b].reduce((s,r)=>s+(byRep[r]?.total||0),0);
+    return totB - totA;
+  });
+
+  let h = `<colgroup>
+    <col style="width:15%">
+    <col style="width:7%"><col style="width:7%"><col style="width:6%">
+    <col style="width:5.5%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:5.5%">
+    <col style="width:8%"><col style="width:7%">
+    <col style="width:7%"><col style="width:7%"><col style="width:8%">
+  </colgroup>
+  <thead>
+  <tr class="grp-hdr">
+    <th class="th-lbl grp-rep" rowspan="2">Rep</th>
+    <th class="grp-1" colspan="3">YTD vs. quota</th>
+    <th class="grp-2" colspan="7">Open pipeline — this FY</th>
+    <th class="grp-3" colspan="3">Total pipeline — all dates</th>
+  </tr>
+  <tr>
+    <th>Closed FYTD</th><th>Quota YTD</th><th>% to Quota</th>
+    <th>S1</th><th>S2</th><th>S3</th><th>S4</th><th>S5</th>
+    <th>Open Pipe</th><th>FY Coverage</th>
+    <th>Total Pipe</th><th>Annual Quota</th><th>Annual Coverage</th>
+  </tr>
+  </thead><tbody>`;
+
+  let gT={s:[0,0,0,0,0],openFY:0,allTime:0,closed:0,annual:0,ytdq:0};
+  for (const mgr of sortedMgrs) {
+    const reps = mgrGroups[mgr].sort((a,b)=>(byRep[b]?.total||0)-(byRep[a]?.total||0));
+    const mS=[0,0,0,0,0]; let mOpenFY=0, mAllTime=0, mClosed=0, mAnnual=0, mYtdQ=0;
+    let repRows = '';
+    for (const rep of reps) {
+      const d = byRep[rep] || { stages:{}, fyStages:{}, total:0, fyTotal:0 };
+      const s1=d.stages['Stage 1 - Discovery']||0, s2=d.stages['Stage 2 - Solution Identification']||0,
+            s3=d.stages['Stage 3 - Validation']||0,
+            s4=(d.stages['Stage 4 – Proposal & Plan']||0)+(d.stages['Stage 4 – Selection']||0),
+            s5=d.stages['Stage 5 – Negotiation']||0;
+      const openFY=d.fyTotal, allTime=d.total, cl=closed[rep]?.total||0, annual=tgt.aeAnnual[rep]||0, ytdq=tgt.aeYtd[rep]||0;
+      const remaining = annual - cl;
+      const covFY = remaining>0 ? openFY/remaining : null;
+      const covAnnual = remaining>0 ? allTime/remaining : null;
+      const pctToQuota = ytdq>0 ? cl/ytdq : null;
+      mS[0]+=s1;mS[1]+=s2;mS[2]+=s3;mS[3]+=s4;mS[4]+=s5;
+      mOpenFY+=openFY; mAllTime+=allTime; mClosed+=cl; mAnnual+=annual; mYtdQ+=ytdq;
+      repRows += `<tr class="ae-row">
+        <td class="lbl-indent">${rep}</td>
+        <td>${K(cl)}</td><td>${ytdq?K(ytdq):'—'}</td><td>${pctToQuota!=null?PCT(pctToQuota):'—'}</td>
+        <td>${s1?K(s1):'—'}</td><td>${s2?K(s2):'—'}</td><td>${s3?K(s3):'—'}</td><td>${s4?K(s4):'—'}</td><td>${s5?K(s5):'—'}</td>
+        <td>${K(openFY)}</td><td class="${covClass(covFY)}">${covFY!=null?covFY.toFixed(1)+'x':'—'}</td>
+        <td>${K(allTime)}</td><td>${annual?K(annual):'—'}</td>
+        <td class="${covClass(covAnnual)}">${covAnnual!=null?covAnnual.toFixed(1)+'x':'—'}</td>
+      </tr>`;
+    }
+    const mRemaining = mAnnual - mClosed;
+    const mCovFY = mRemaining>0 ? mOpenFY/mRemaining : null;
+    const mCovAnnual = mRemaining>0 ? mAllTime/mRemaining : null;
+    const mPctToQuota = mYtdQ>0 ? mClosed/mYtdQ : null;
+    h += `<tr class="mgr-row">
+      <td class="lbl-sub">${mgr}</td>
+      <td>${K(mClosed)}</td><td>${mYtdQ?K(mYtdQ):'—'}</td><td>${mPctToQuota!=null?PCT(mPctToQuota):'—'}</td>
+      <td>${mS[0]?K(mS[0]):'—'}</td><td>${mS[1]?K(mS[1]):'—'}</td><td>${mS[2]?K(mS[2]):'—'}</td><td>${mS[3]?K(mS[3]):'—'}</td><td>${mS[4]?K(mS[4]):'—'}</td>
+      <td>${K(mOpenFY)}</td><td class="${covClass(mCovFY)}">${mCovFY!=null?mCovFY.toFixed(1)+'x':'—'}</td>
+      <td>${K(mAllTime)}</td><td>${mAnnual?K(mAnnual):'—'}</td>
+      <td class="${covClass(mCovAnnual)}">${mCovAnnual!=null?mCovAnnual.toFixed(1)+'x':'—'}</td>
+    </tr>`;
+    h += repRows;
+    gT.s[0]+=mS[0];gT.s[1]+=mS[1];gT.s[2]+=mS[2];gT.s[3]+=mS[3];gT.s[4]+=mS[4];
+    gT.openFY+=mOpenFY; gT.allTime+=mAllTime; gT.closed+=mClosed; gT.annual+=mAnnual; gT.ytdq+=mYtdQ;
+  }
+  const gRemaining = gT.annual - gT.closed;
+  const gCovFY = gRemaining>0 ? gT.openFY/gRemaining : null;
+  const gCovAnnual = gRemaining>0 ? gT.allTime/gRemaining : null;
+  const gPctToQuota = gT.ytdq>0 ? gT.closed/gT.ytdq : null;
+  h += `<tr class="total-row">
+    <td class="lbl-sub">Total</td>
+    <td>${K(gT.closed)}</td><td>${K(gT.ytdq)}</td><td>${gPctToQuota!=null?PCT(gPctToQuota):'—'}</td>
+    <td>${K(gT.s[0])}</td><td>${K(gT.s[1])}</td><td>${K(gT.s[2])}</td><td>${K(gT.s[3])}</td><td>${K(gT.s[4])}</td>
+    <td>${K(gT.openFY)}</td><td class="${covClass(gCovFY)}">${gCovFY!=null?gCovFY.toFixed(1)+'x':'—'}</td>
+    <td>${K(gT.allTime)}</td><td>${K(gT.annual)}</td>
+    <td class="${covClass(gCovAnnual)}">${gCovAnnual!=null?gCovAnnual.toFixed(1)+'x':'—'}</td>
+  </tr>`;
+  h += `</tbody>`;
+  document.getElementById('repTable').innerHTML = h;
 }
 
-// ─── MAIN ────────────────────────────────────────────
+let healthData = [];
+let healthSortCol = 1, healthSortAsc = false; // default: ARR desc
+
+function buildHealthCards(rows){
+  const totalARR = rows.reduce((s,r)=>s+r.arr,0);
+  document.getElementById('ch-total').textContent = rows.length;
+  document.getElementById('ch-arr').textContent = '$' + N(Math.round(totalARR/1e6),1) + 'M';
+  document.getElementById('ch-red').textContent = rows.filter(r=>healthClass(r.pulseScore)==='red').length;
+  document.getElementById('ch-yellow').textContent = rows.filter(r=>healthClass(r.pulseScore)==='yellow').length;
+  document.getElementById('ch-green').textContent = rows.filter(r=>healthClass(r.pulseScore)==='green').length;
+}
+
+function filterHealthTable(){
+  const q = document.getElementById('chSearch').value.toLowerCase();
+  const type = document.getElementById('chTypeFilter').value;
+  const health = document.getElementById('chHealthFilter').value;
+  const filtered = healthData.filter(r => {
+    if(q && !r.name.toLowerCase().includes(q)) return false;
+    if(type && r.contractType !== type) return false;
+    if(health && healthClass(r.pulseScore) !== health) return false;
+    return true;
+  });
+  renderHealthTable(filtered);
+}
+
+function sortHealthTable(col){
+  if(healthSortCol === col) { healthSortAsc = !healthSortAsc; }
+  else { healthSortCol = col; healthSortAsc = (col===0); }
+  filterHealthTable();
+}
+
+function renderHealthTable(rows){
+  const getVal = (r,col) => [
+    r.name, r.arr, r.contractType, r.contractStart, r.contractEnd,
+    r.pulseScore==null?-1:r.pulseScore, r.currUsage==null?-1:r.currUsage,
+    r.variance==null?-999:r.variance, r.vertical
+  ][col];
+  const sorted = [...rows].sort((a,b) => {
+    const av = getVal(a, healthSortCol), bv = getVal(b, healthSortCol);
+    if(typeof av==='number') return healthSortAsc ? av-bv : bv-av;
+    return healthSortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+  });
+
+  const headers = ['Customer','ARR','Type','Contract Start','Contract End','Pulse (CSM)','Last 7-Day Avg Usage','vs. 4-Wk Avg','Vertical'];
+  let thead = '<thead><tr>';
+  headers.forEach((h,i) => {
+    const cls = healthSortCol===i ? (healthSortAsc?'sort-asc':'sort-desc') : '';
+    thead += `<th class="${cls}" onclick="sortHealthTable(${i})">${h}</th>`;
+  });
+  thead += '</tr></thead>';
+
+  let body = '<tbody>';
+  for (const r of sorted) {
+    const arrK = '$' + N(Math.round(r.arr/1e3)) + 'K';
+    const varCls = r.variance==null ? 'var-flat' : r.variance>0.02 ? 'var-good' : r.variance<-0.02 ? 'var-bad' : 'var-flat';
+    const varTxt = r.variance==null ? '<span style="color:#9ba3af">—</span>' : (r.variance>=0?'+':'') + PCT(r.variance,1);
+    body += `<tr>
+      <td title="${r.name}">${healthDot(r.pulseScore)}${r.name}</td>
+      <td>${arrK}</td>
+      <td class="td-center">${tagHtml(r.contractType)}</td>
+      <td>${fmtDateShort(r.contractStart)}</td>
+      <td>${fmtContractEnd(r.contractEnd)}</td>
+      <td class="td-left">${r.pulse || '<span style="color:#9ba3af">—</span>'}</td>
+      <td>${r.currUsage!=null ? N(Math.round(r.currUsage)) : '<span style="color:#9ba3af">—</span>'}</td>
+      <td class="${varCls}">${varTxt}</td>
+      <td class="td-left">${r.vertical || '<span style="color:#9ba3af">—</span>'}</td>
+    </tr>`;
+  }
+  body += '</tbody>';
+
+  document.getElementById('healthTable').innerHTML = thead + body;
+  document.getElementById('ch-count').textContent = `Showing ${rows.length} of ${healthData.length} customers`;
+}
+
+function buildHealthTable(rows){
+  healthData = rows;
+  buildHealthCards(rows);
+  renderHealthTable(rows);
+}
+
+function showTab(name){
+  document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('tabBtn-'+name).classList.add('active');
+}
+
+// ─── MAIN ─────────────────────────────────────────────
 async function waitForCowork(timeout=5000) {
   const start=Date.now();
   while(!window.cowork?.callMcpTool) {
-    if(Date.now()-start>timeout) return; // standalone mode — will use /api/sql
+    if(Date.now()-start>timeout) return;
     await new Promise(r=>setTimeout(r,150));
   }
 }
 
 async function loadAll() {
-  const msg=document.getElementById('loadingMsg');
+  const msg = document.getElementById('loadingMsg');
   try {
-    msg.textContent='Connecting to Snowflake…';
+    msg.textContent = 'Connecting to Snowflake…';
     await waitForCowork();
-    msg.textContent='Fetching actuals & budget from Snowflake…';
-    const [finData,budData,arrData,cashData,billData,collData,salesData,tgtData,hcData,hcBData,kpiData,hcDeptBdData,pipeData]=await Promise.all([
-      execSQL(Q.financials),execSQL(Q.budget),execSQL(Q.arr),
-      execSQL(Q.cash),execSQL(Q.billings),execSQL(Q.collections),
-      execSQL(Q.sales),execSQL(Q.salesTargets),execSQL(Q.headcount),execSQL(Q.hcBridge),execSQL(Q.kpi),execSQL(Q.hcDeptBudget),execSQL(Q.pipeline)
+    msg.textContent = 'Fetching pipeline, closed deals, quotas, and customer health…';
+    const [pipeRows, closedRows, tgtRows, healthRows] = await Promise.all([
+      execSQL(Q.pipeline), execSQL(Q.closedFYTD), execSQL(Q.salesTargets), execSQL(Q.customerHealth)
     ]);
-    msg.textContent='Building dashboard…';
-    const fin=preProcessFin(finData), bud=preProcessBudget(budData);
-    const arr=preProcessARR(arrData), cash=preProcessCash(cashData);
-    const bill=preProcessBC(billData,collData), hc=preProcessHC(hcData,hcBData);
-    const sales=preProcessSales(salesData), tgt=preProcessSalesTargets(tgtData), kpi=preProcessKPI(kpiData), pipeline=preProcessPipeline(pipeData);
-    const hcdb=preProcessHCDeptBudget(hcDeptBdData);
-    buildExec(fin,bud,arr,cash,bill,hc,kpi);
-    buildARR(arr,kpi);
-    buildSales(sales,tgt,pipeline);
-    buildRevenue(fin,bud);
-    buildTTM(fin);
-    buildCash(fin,bud,cash,bill,kpi);
-    buildSvcPL(fin,bud);
-    buildExpense(fin,bud);
-    buildDept(fin,bud);
-    buildHeadcount(hc,kpi,hcdb);
-    buildQS(fin,bud,arr,cash,bill,hc,kpi);
-    document.getElementById('loadingOverlay').style.display='none';
-    // Load Customer ARR tab separately — won't crash the main dashboard if it fails
-    execSQL(Q.customerArr).then(buildCustomerARR).catch(err => {
-      document.getElementById('custArrBody').innerHTML =
-        `<tr><td colspan="5" style="color:#dc2626;padding:16px">Failed to load: ${err.message}</td></tr>`;
-    });
-  } catch(e) {
-    msg.textContent='Error: '+e.message;
+    msg.textContent = 'Building dashboard…';
+    const deals = preProcessPipeline(pipeRows);
+    const closed = preProcessClosed(closedRows);
+    const tgt = preProcessTargets(tgtRows);
+    const health = preProcessCustomerHealth(healthRows);
+
+    buildCards(deals, closed, tgt);
+    buildCoverage(deals, tgt);
+    buildRepTable(deals, closed, tgt);
+    buildHealthTable(health);
+
+    document.getElementById('loadingOverlay').style.display = 'none';
+  } catch (e) {
+    document.getElementById('content').innerHTML =
+      `<div class="err-box"><strong>Data load failed:</strong> ${e.message}</div>`;
+    document.getElementById('loadingOverlay').style.display = 'none';
     console.error(e);
   }
 }
