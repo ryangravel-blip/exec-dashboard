@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <title>Amperity — Real-Time Dashboards</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
 <style>
 :root { color-scheme: light; }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -163,10 +162,6 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
     <ul style="margin:4px 0 10px 20px;"><li>None this week</li></ul>
     <!-- WEEKLY_SUMMARY_END -->
   </div>
-
-  <div class="section-title">Pipeline coverage by quarter <span class="hint">Stage 1+ open pipe vs. AE quota, by close-quarter</span></div>
-  <div class="chart-card"><canvas id="coverageChart"></canvas></div>
-  <div class="table-card"><table id="coverageTable"></table></div>
 
   <div class="section-title">Rep productivity <span class="hint">Open pipe by stage, closed FYTD, coverage vs. remaining quota</span></div>
   <div class="table-card" style="overflow-x:auto"><table id="repTable"></table></div>
@@ -550,39 +545,6 @@ function buildCards(deals, closed, tgt){
     </div>`).join('');
 }
 
-function buildCoverage(deals, tgt){
-  const rows = QUARTERS.map(q => {
-    const pipe = deals.filter(d=>d.fq===q.fq).reduce((s,d)=>s+d.arr,0);
-    const quota = Object.values(tgt.aeQtr[q.fq]||{}).reduce((s,v)=>s+v,0);
-    const cov = quota>0 ? pipe/quota : null;
-    return { label:q.label, pipe, quota, cov };
-  });
-
-  new Chart(document.getElementById('coverageChart'), {
-    type: 'bar',
-    data: {
-      labels: rows.map(r=>r.label),
-      datasets: [
-        { label:'Open pipe (Stage 1+)', data: rows.map(r=>Math.round(r.pipe/1000)), backgroundColor: BRAND.teal, borderRadius: 3 },
-        { label:'Quota', data: rows.map(r=>Math.round(r.quota/1000)), backgroundColor: BRAND.black, borderRadius: 3 },
-      ]
-    },
-    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top', labels:{boxWidth:12}}}, scales:{ x:{grid:{display:false}}, y:{grid:{color:'#f1f5f9'}, ticks:{callback:v=>'$'+v+'K'}} } }
-  });
-
-  let h = `<thead><tr><th class="th-lbl">Quarter</th><th>Open Pipe (S1+)</th><th>Quota</th><th>Coverage</th></tr></thead><tbody>`;
-  for (const r of rows) {
-    h += `<tr>
-      <td class="lbl">${r.label}</td>
-      <td>${K(r.pipe)}</td>
-      <td>${r.quota>0?K(r.quota):'—'}</td>
-      <td class="${covClass(r.cov)}">${r.cov!=null?r.cov.toFixed(1)+'x':'—'}</td>
-    </tr>`;
-  }
-  h += `</tbody>`;
-  document.getElementById('coverageTable').innerHTML = h;
-}
-
 function buildRepTable(deals, closed, tgt){
   const byRep = {};
   for (const d of deals) {
@@ -808,7 +770,6 @@ async function loadAll() {
     const health = preProcessCustomerHealth(healthRows);
 
     buildCards(deals, closed, tgt);
-    buildCoverage(deals, tgt);
     buildRepTable(deals, closed, tgt);
     buildHealthTable(health);
 
