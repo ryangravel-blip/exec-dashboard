@@ -72,6 +72,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .custarr-table td:not(:first-child) { text-align: right; }
 .custarr-table td.td-center { text-align: center; }
 .custarr-table td.td-left { text-align: left; }
+.custarr-table tbody tr.row-red td { background: #fbe9e9 !important; }
+.custarr-table tbody tr.row-yellow td { background: #fdf3d9 !important; }
+.custarr-table tbody tr.row-green td { background: #e7f5ea !important; }
 .custarr-table tbody tr:hover td { background: #ebf4ff !important; }
 .custarr-table tbody tr:nth-child(even) td { background: #fcfcfc; }
 .custarr-count { font-size: 11px; color: #9ba3af; margin-top: 8px; }
@@ -171,9 +174,9 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
   <div class="custarr-summary">
     <div class="custarr-stat"><div class="cs-label">Total Customers</div><div class="cs-value" id="ch-total">—</div><div class="cs-sub">active ARR</div></div>
     <div class="custarr-stat"><div class="cs-label">Total ARR</div><div class="cs-value" id="ch-arr">—</div><div class="cs-sub">current</div></div>
-    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-red"></span>Red</div><div class="cs-value" id="ch-red">—</div><div class="cs-sub">Pulse 1–2</div></div>
-    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-yellow"></span>Yellow</div><div class="cs-value" id="ch-yellow">—</div><div class="cs-sub">Pulse 3</div></div>
-    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-green"></span>Green</div><div class="cs-value" id="ch-green">—</div><div class="cs-sub">Pulse 4–5</div></div>
+    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-red"></span>Red</div><div class="cs-value" id="ch-red">—</div><div class="cs-sub">health_color</div></div>
+    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-yellow"></span>Yellow</div><div class="cs-value" id="ch-yellow">—</div><div class="cs-sub">health_color</div></div>
+    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-green"></span>Green</div><div class="cs-value" id="ch-green">—</div><div class="cs-sub">health_color</div></div>
   </div>
 
   <div class="section-title">Customer health — weekly summary <span class="hint">Auto-generated Monday mornings · Pulse (CSM) changes and usage movers, week over week</span></div>
@@ -204,7 +207,7 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
     <!-- HEALTH_SUMMARY_END -->
   </div>
 
-  <div class="section-title">Customer health <span class="hint">ARR base from Salesforce · Relationship Health Pulse (CSM) · Last 7-day AMPs usage vs. trailing 4-week average</span></div>
+  <div class="section-title">Customer health <span class="hint">ARR base from Salesforce · P/A/M/E + overall score and health_color from PROD.ACCOUNT360.ACCOUNT_HEALTH (latest snapshot)</span></div>
   <div class="custarr-controls">
     <input type="text" id="chSearch" placeholder="Search customers…" oninput="filterHealthTable()">
     <label>Type: <select id="chTypeFilter" onchange="filterHealthTable()">
@@ -343,11 +346,11 @@ const Q = {
     GROUP BY ROLE_TYPE, NAME, MANAGER_NAME, MONTH_START`,
 
   // Customer Health: same base as the monthly dashboard's Customer ARR tab
-  // (PROD.DEALSBASE.CUSTOMER_ACCOUNT_MAP joined to PROD.SALESFORCE.ACCOUNTS),
-  // plus: Relationship Health Pulse (CSM) from the raw Salesforce Account object
-  // (not yet mirrored into the cleaned PROD.SALESFORCE.ACCOUNTS table), contract
-  // start date, and a last-7-day vs. trailing-4-week AMPs usage comparison from
-  // PROD.FISHBOWL.AMPS.
+  // (PROD.DEALSBASE.CUSTOMER_ACCOUNT_MAP joined to PROD.SALESFORCE.ACCOUNTS), plus
+  // contract start date and the account's latest health scorecard from
+  // PROD.ACCOUNT360.ACCOUNT_HEALTH (daily snapshots — take the most recent CALC_DT
+  // per account). P/A/M/E scores + overall score + health_color (red/yellow/green)
+  // drive the score columns and row highlighting on the Customer Health tab.
   customerHealth: `
     WITH sf_customers AS (
       SELECT
@@ -372,26 +375,18 @@ const Q = {
       GROUP BY cam.CUSTOMER_ID, a.VERTICAL
       QUALIFY ROW_NUMBER() OVER (PARTITION BY cam.CUSTOMER_ID ORDER BY cnt DESC) = 1
     ),
-    pulse AS (
-      SELECT ID AS ACCOUNT_ID, RELATIONSHIP_HEALTH_PULSE_CSM_C AS PULSE
-      FROM LOAD.SALESFORCE_RAW.ACCOUNT
-    ),
-    usage_agg AS (
-      SELECT SALESFORCE_ACCOUNT_ID,
-        SUM(CASE WHEN USAGE_DATE >= DATEADD(day,-7,CURRENT_DATE()) THEN AMPS_AMOUNT ELSE 0 END) / 7.0 AS CURR_7D_AVG,
-        SUM(CASE WHEN USAGE_DATE >= DATEADD(day,-28,CURRENT_DATE()) THEN AMPS_AMOUNT ELSE 0 END) / 28.0 AS AVG_4WK_AVG
-      FROM PROD.FISHBOWL.AMPS
-      WHERE USAGE_DATE >= DATEADD(day,-28,CURRENT_DATE()) AND TENANT_IS_SANDBOX = FALSE
-      GROUP BY SALESFORCE_ACCOUNT_ID
+    health AS (
+      SELECT ACCOUNT_ID, P_SCORE, A_SCORE, M_SCORE, E_SCORE, OVERALL_SCORE, HEALTH_COLOR
+      FROM PROD.ACCOUNT360.ACCOUNT_HEALTH
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY ACCOUNT_ID ORDER BY CALC_DT DESC) = 1
     )
     SELECT
       c.CUSTOMER_NAME, c.ARR, c.CONTRACT_TYPE, c.CONTRACT_START_DT, c.CONTRACT_END_DT,
       COALESCE(v.VERTICAL, '') AS VERTICAL,
-      p.PULSE, u.CURR_7D_AVG, u.AVG_4WK_AVG
+      h.P_SCORE, h.A_SCORE, h.M_SCORE, h.E_SCORE, h.OVERALL_SCORE, h.HEALTH_COLOR
     FROM sf_customers c
     LEFT JOIN sf_vertical v ON c.CUSTOMER_ID = v.CUSTOMER_ID
-    LEFT JOIN pulse p ON c.ACCOUNT_ID = p.ACCOUNT_ID
-    LEFT JOIN usage_agg u ON c.ACCOUNT_ID = u.SALESFORCE_ACCOUNT_ID
+    LEFT JOIN health h ON c.ACCOUNT_ID = h.ACCOUNT_ID
     ORDER BY c.ARR DESC`,
 };
 
@@ -461,28 +456,16 @@ function preProcessTargets(rows){
 
 function preProcessCustomerHealth(rows){
   return rows.map(r => {
-    const pulseRaw = r.PULSE || '';
-    const score = pulseRaw ? parseInt(pulseRaw, 10) : null;
-    const curr = r.CURR_7D_AVG!=null ? +r.CURR_7D_AVG : null;
-    const prior = r.AVG_4WK_AVG!=null ? +r.AVG_4WK_AVG : null;
-    const variance = (curr!=null && prior) ? (curr-prior)/prior : null;
+    const num = v => v!=null && v!=='' ? +v : null;
     return {
       name: r.CUSTOMER_NAME, arr: +(r.ARR||0), contractType: r.CONTRACT_TYPE,
       contractStart: r.CONTRACT_START_DT||'', contractEnd: r.CONTRACT_END_DT||'',
-      vertical: r.VERTICAL||'', pulse: pulseRaw, pulseScore: (score!=null && !isNaN(score))?score:null,
-      currUsage: curr, priorUsage: prior, variance,
+      vertical: r.VERTICAL||'',
+      pScore: num(r.P_SCORE), aScore: num(r.A_SCORE), mScore: num(r.M_SCORE), eScore: num(r.E_SCORE),
+      overallScore: num(r.OVERALL_SCORE), healthColor: (r.HEALTH_COLOR||'').toLowerCase(),
     };
   });
 }
-
-function healthClass(score){
-  if(score==null) return 'unk';
-  if(score<=2) return 'red';
-  if(score===3) return 'yellow';
-  return 'green';
-}
-
-function healthDot(score){ return `<span class="health-dot health-${healthClass(score)}"></span>`; }
 
 function tagHtml(type) {
   const cls = type==='Subscription'?'tag-sub':type==='Consumption'?'tag-con':'tag-unk';
@@ -659,15 +642,15 @@ function buildRepTable(deals, closed, tgt){
 }
 
 let healthData = [];
-let healthSortCol = 1, healthSortAsc = false; // default: ARR desc
+let healthSortCol = 2, healthSortAsc = false; // default: ARR desc
 
 function buildHealthCards(rows){
   const totalARR = rows.reduce((s,r)=>s+r.arr,0);
   document.getElementById('ch-total').textContent = rows.length;
   document.getElementById('ch-arr').textContent = '$' + N(Math.round(totalARR/1e6),1) + 'M';
-  document.getElementById('ch-red').textContent = rows.filter(r=>healthClass(r.pulseScore)==='red').length;
-  document.getElementById('ch-yellow').textContent = rows.filter(r=>healthClass(r.pulseScore)==='yellow').length;
-  document.getElementById('ch-green').textContent = rows.filter(r=>healthClass(r.pulseScore)==='green').length;
+  document.getElementById('ch-red').textContent = rows.filter(r=>r.healthColor==='red').length;
+  document.getElementById('ch-yellow').textContent = rows.filter(r=>r.healthColor==='yellow').length;
+  document.getElementById('ch-green').textContent = rows.filter(r=>r.healthColor==='green').length;
 }
 
 function filterHealthTable(){
@@ -677,7 +660,7 @@ function filterHealthTable(){
   const filtered = healthData.filter(r => {
     if(q && !r.name.toLowerCase().includes(q)) return false;
     if(type && r.contractType !== type) return false;
-    if(health && healthClass(r.pulseScore) !== health) return false;
+    if(health && r.healthColor !== health) return false;
     return true;
   });
   renderHealthTable(filtered);
@@ -685,15 +668,17 @@ function filterHealthTable(){
 
 function sortHealthTable(col){
   if(healthSortCol === col) { healthSortAsc = !healthSortAsc; }
-  else { healthSortCol = col; healthSortAsc = (col===0); }
+  else { healthSortCol = col; healthSortAsc = (col===0 || col===1); }
   filterHealthTable();
 }
 
+function fmtScore(v){ return v!=null ? v.toFixed(1) : '<span style="color:#9ba3af">—</span>'; }
+
 function renderHealthTable(rows){
   const getVal = (r,col) => [
-    r.name, r.arr, r.contractType, r.contractStart, r.contractEnd,
-    r.pulseScore==null?-1:r.pulseScore, r.currUsage==null?-1:r.currUsage,
-    r.variance==null?-999:r.variance, r.vertical
+    r.name, r.vertical, r.arr, r.contractType, r.contractStart, r.contractEnd,
+    r.pScore==null?-1:r.pScore, r.aScore==null?-1:r.aScore, r.mScore==null?-1:r.mScore,
+    r.eScore==null?-1:r.eScore, r.overallScore==null?-1:r.overallScore
   ][col];
   const sorted = [...rows].sort((a,b) => {
     const av = getVal(a, healthSortCol), bv = getVal(b, healthSortCol);
@@ -701,7 +686,7 @@ function renderHealthTable(rows){
     return healthSortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
   });
 
-  const headers = ['Customer','ARR','Type','Contract Start','Contract End','Pulse (CSM)','Last 7-Day Avg Usage','vs. 4-Wk Avg','Vertical'];
+  const headers = ['Customer','Vertical','ARR','Type','Contract Start','Contract End','P Score','A Score','M Score','E Score','Overall Score'];
   let thead = '<thead><tr>';
   headers.forEach((h,i) => {
     const cls = healthSortCol===i ? (healthSortAsc?'sort-asc':'sort-desc') : '';
@@ -712,18 +697,19 @@ function renderHealthTable(rows){
   let body = '<tbody>';
   for (const r of sorted) {
     const arrK = '$' + N(Math.round(r.arr/1e3)) + 'K';
-    const varCls = r.variance==null ? 'var-flat' : r.variance>0.02 ? 'var-good' : r.variance<-0.02 ? 'var-bad' : 'var-flat';
-    const varTxt = r.variance==null ? '<span style="color:#9ba3af">—</span>' : (r.variance>=0?'+':'') + PCT(r.variance,1);
-    body += `<tr>
-      <td title="${r.name}">${healthDot(r.pulseScore)}${r.name}</td>
+    const rowCls = ['red','yellow','green'].includes(r.healthColor) ? `row-${r.healthColor}` : '';
+    body += `<tr class="${rowCls}">
+      <td title="${r.name}">${r.name}</td>
+      <td class="td-left">${r.vertical || '<span style="color:#9ba3af">—</span>'}</td>
       <td>${arrK}</td>
       <td class="td-center">${tagHtml(r.contractType)}</td>
       <td>${fmtDateShort(r.contractStart)}</td>
       <td>${fmtContractEnd(r.contractEnd)}</td>
-      <td class="td-left">${r.pulse || '<span style="color:#9ba3af">—</span>'}</td>
-      <td>${r.currUsage!=null ? N(Math.round(r.currUsage)) : '<span style="color:#9ba3af">—</span>'}</td>
-      <td class="${varCls}">${varTxt}</td>
-      <td class="td-left">${r.vertical || '<span style="color:#9ba3af">—</span>'}</td>
+      <td>${fmtScore(r.pScore)}</td>
+      <td>${fmtScore(r.aScore)}</td>
+      <td>${fmtScore(r.mScore)}</td>
+      <td>${fmtScore(r.eScore)}</td>
+      <td>${fmtScore(r.overallScore)}</td>
     </tr>`;
   }
   body += '</tbody>';
