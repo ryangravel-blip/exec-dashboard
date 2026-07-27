@@ -419,20 +419,31 @@ function preProcessClosed(rows){
 
 function preProcessTargets(rows){
   const ae = {}, aeManager = {}, aeAnnual = {}, aeYtd = {}, aeQtr = {};
+  const rvpAnnual = {}, rvpYtd = {}, rvpQtr = {};
   const YTD_MONTHS = new Set(['2026-02-01','2026-03-01','2026-04-01','2026-05-01','2026-06-01']);
   for (const r of rows) {
-    if (r.ROLE_TYPE !== 'AE') continue;
     const name = alias(r.NAME||''), val = +(r.TARGET||0), mgr = alias(r.MANAGER_NAME||'');
-    if (EXCLUDED_REPS.has(name)) continue;
     const m = parseDate(r.MONTH_START);
-    if (mgr && !aeManager[name]) aeManager[name] = mgr;
-    aeAnnual[name] = (aeAnnual[name]||0) + val;
-    if (YTD_MONTHS.has(m)) aeYtd[name] = (aeYtd[name]||0) + val;
-    for (const q of QUARTERS) {
-      if (q.months.includes(m)) { if(!aeQtr[q.fq]) aeQtr[q.fq]={}; aeQtr[q.fq][name]=(aeQtr[q.fq][name]||0)+val; }
+    if (r.ROLE_TYPE === 'AE') {
+      if (EXCLUDED_REPS.has(name)) continue;
+      if (mgr && !aeManager[name]) aeManager[name] = mgr;
+      aeAnnual[name] = (aeAnnual[name]||0) + val;
+      if (YTD_MONTHS.has(m)) aeYtd[name] = (aeYtd[name]||0) + val;
+      for (const q of QUARTERS) {
+        if (q.months.includes(m)) { if(!aeQtr[q.fq]) aeQtr[q.fq]={}; aeQtr[q.fq][name]=(aeQtr[q.fq][name]||0)+val; }
+      }
+    } else if (r.ROLE_TYPE === 'RVP') {
+      // RVPs carry their own quota in mrp_sales_targets — this is NOT a rollup of
+      // their AEs' quotas (the two can differ), so keep it in a separate map keyed
+      // by the RVP's own name and use it directly for that manager's row.
+      rvpAnnual[name] = (rvpAnnual[name]||0) + val;
+      if (YTD_MONTHS.has(m)) rvpYtd[name] = (rvpYtd[name]||0) + val;
+      for (const q of QUARTERS) {
+        if (q.months.includes(m)) { if(!rvpQtr[q.fq]) rvpQtr[q.fq]={}; rvpQtr[q.fq][name]=(rvpQtr[q.fq][name]||0)+val; }
+      }
     }
   }
-  return { aeManager, aeAnnual, aeYtd, aeQtr, aeNames: Object.keys(aeAnnual) };
+  return { aeManager, aeAnnual, aeYtd, aeQtr, aeNames: Object.keys(aeAnnual), rvpAnnual, rvpYtd, rvpQtr };
 }
 
 function preProcessCustomerHealth(rows){
@@ -604,7 +615,7 @@ function buildRepTable(deals, closed, tgt){
   let gT={s:[0,0,0,0,0],openFY:0,allTime:0,closed:0,annual:0,ytdq:0};
   for (const mgr of sortedMgrs) {
     const reps = mgrGroups[mgr].sort((a,b)=>(byRep[b]?.total||0)-(byRep[a]?.total||0));
-    const mS=[0,0,0,0,0]; let mOpenFY=0, mAllTime=0, mClosed=0, mAnnual=0, mYtdQ=0;
+    const mS=[0,0,0,0,0]; let mOpenFY=0, mAllTime=0, mClosed=0;
     let repRows = '';
     for (const rep of reps) {
       const d = byRep[rep] || { stages:{}, fyStages:{}, total:0, fyTotal:0 };
@@ -618,7 +629,7 @@ function buildRepTable(deals, closed, tgt){
       const covAnnual = remaining>0 ? allTime/remaining : null;
       const pctToQuota = ytdq>0 ? cl/ytdq : null;
       mS[0]+=s1;mS[1]+=s2;mS[2]+=s3;mS[3]+=s4;mS[4]+=s5;
-      mOpenFY+=openFY; mAllTime+=allTime; mClosed+=cl; mAnnual+=annual; mYtdQ+=ytdq;
+      mOpenFY+=openFY; mAllTime+=allTime; mClosed+=cl;
       repRows += `<tr class="ae-row">
         <td class="lbl-indent">${rep}</td>
         <td>${K(cl)}</td><td>${ytdq?K(ytdq):'—'}</td><td>${pctToQuota!=null?PCT(pctToQuota):'—'}</td>
@@ -628,6 +639,13 @@ function buildRepTable(deals, closed, tgt){
         <td class="${covClass(covAnnual)}">${covAnnual!=null?covAnnual.toFixed(1)+'x':'—'}</td>
       </tr>`;
     }
+    // RVP's own quota (not a rollup of their AEs' quotas) — fall back to summing
+    // the group's AE quotas only for the 'Unassigned' bucket, which has no real
+    // RVP quota row to look up.
+    const mAnnual = tgt.rvpAnnual[mgr] != null ? tgt.rvpAnnual[mgr]
+      : reps.reduce((s,rep)=>s+(tgt.aeAnnual[rep]||0),0);
+    const mYtdQ = tgt.rvpYtd[mgr] != null ? tgt.rvpYtd[mgr]
+      : reps.reduce((s,rep)=>s+(tgt.aeYtd[rep]||0),0);
     const mRemaining = mAnnual - mClosed;
     const mCovFY = mRemaining>0 ? mOpenFY/mRemaining : null;
     const mCovAnnual = mRemaining>0 ? mAllTime/mRemaining : null;
