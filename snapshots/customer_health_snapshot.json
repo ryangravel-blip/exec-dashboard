@@ -1,115 +1,803 @@
-{"snapshot_date": "2026-07-20", "columns": ["customer_id","customer_name","account_id","pulse","usage_7d_avg"], "customers": [
-["32344","Rhone Apparel, Inc.","001f400001KvAijAAF","4 - Secure (Satisfied)","2168.0907457568169"],
-["642","Johnny Was, LLC","001f400001KvBT7AAN","3 - Stable (Passive)","2885.7581508642884"],
-["60450","Asset Marketing Services LLC","001f400001Kv9f8AAB","3 - Stable (Passive)","330.77132619504624"],
-["83191","PetSmart","001f4000002YGm9AAG","","60.994532564180119"],
-["55885","JB Hi-Fi Group Pty Ltd","0015G000027ZE5EQAW","4 - Secure (Satisfied)","16822.022067495032"],
-["48122","Prog Leasing, LLC","0015G00002YyTNUQA3","4 - Secure (Satisfied)","4958.6172518764506"],
-["31333","Oxford Industries, Inc.","001f400001KvAQRAA3","2 - At-Risk (Detractor)","4130.7068225077101"],
-["2630","Deckers Outdoor Corporation","001f400001KvBdEAAV","3 - Stable (Passive)","56920.361342045515"],
-["36458","GoHealth, LLC","0015G00002KcHJPQA3","2 - At-Risk (Detractor)","6687.1973606412594"],
-["678","World of Jeans and Tops dba Tillys","001f400001KvBFHAA3","3 - Stable (Passive)","2537.7310580286562"],
-["4159","Home Depot Store Support, Inc.","001f4000002YGffAAG","4 - Secure (Satisfied)","206372.86464060209"],
-["23","MGM Resorts International","001f4000002YGiXAAW","4 - Secure (Satisfied)","26670.103326624838"],
-["9","Brooks Sports, Inc.","001f4000004NrPdAAK","4 - Secure (Satisfied)","16000.902513169161"],
-["37899","The Metropolitan Museum of Art","0015G00001xEWCwQAO","4 - Secure (Satisfied)","1025.4011877844316"],
-["7","BECU","001f4000002YGi8AAG","2 - At-Risk (Detractor)","14622.628702124974"],
-["31","Servco Pacific Inc.","001f400000hYDMHAA4","3 - Stable (Passive)","3689.6558170684184"],
-["15340","Smithsonian","001f40000110mFtAAI","4 - Secure (Satisfied)","1743.810520300598"],
-["641","Johnnie-O","001f400001KvB2BAAV","5 - Thriving (Promoter)","1995.6712702112509"],
-["24070","Gerber Products Company","001Ql00000PZHQzIAP","4 - Secure (Satisfied)","465.81410911495976"],
-["14","The Gap, Inc.","001f4000002YGmEAAW","2 - At-Risk (Detractor)","254965.04982755802"],
-["80571","St. George's University","001Ql00000fe3xFIAQ","","24.884797216171819"],
-["38730","Accent Group Ltd","0015G000027ZE95QAG","5 - Thriving (Promoter)","31193.363477643637"],
-["50643","Fleet Farm Group LLC","001Ql000000gbPnIAI","5 - Thriving (Promoter)","9731.7836805888892"],
-["657","Shiseido Americas Corporation","0015G00001VpthfQAB","5 - Thriving (Promoter)","9913.6151822284555"],
-["675","Vince, LLC","001f400001KvBEdAAN","2 - At-Risk (Detractor)","2787.0372271824658"],
-["80874","Scheels","001f400001KvBNCAA3","5 - Thriving (Promoter)","3300.5095802032552"],
-["5072","First Hawaiian Bank","001f400001JU8VfAAL","2 - At-Risk (Detractor)","1687.3899473843874"],
-["55283","Funko, LLC","001f400001Kv9SiAAJ","3 - Stable (Passive)","6667.5932984920846"],
-["27","Nordstrom, Inc.","001f4000002YGhBAAW","2 - At-Risk (Detractor)","228024.6229487996"],
-["28279","EoS Fitness","0015G00001xDwktQAC","3 - Stable (Passive)","12624.935728160173"],
-["36","Endeavour Group Limited","001f400000FhLt8AAF","5 - Thriving (Promoter)","43708.655442875417"],
-["21884","Tumi, Inc.","001f400001KvBDsAAN","2 - At-Risk (Detractor)","3290.1203165385296"],
-["35338","General Motors LLC","001Ql00000Ox1dPIAR","2 - At-Risk (Detractor)","386.91613577202355"],
-["86238","Blain Supply Inc","001f400001Kv9NjAAJ","",""],
-["85023","Preferred Travel Group","001Ql00000rqjk6IAA","5 - Thriving (Promoter)","2.086515819476348"],
-["16488","Rogers Communications Canada, Inc","0015G00001WM9GCQA1","2 - At-Risk (Detractor)","12316.797316621756"],
-["57112","L. L. Bean, Inc.","001f4000002YGgxAAG","5 - Thriving (Promoter)","36455.735642688691"],
-["50638","Choice Hotels International, Inc","001f400000GedyfAAB","2 - At-Risk (Detractor)","60576.627587473566"],
-["55282","Books A Million","001f400001KvBEkAAN","5 - Thriving (Promoter)","5005.0092154905515"],
-["56607","American Honda Motor Co., Inc.","001f400000TGbupAAD","2 - At-Risk (Detractor)","122629.16098962647"],
-["76942","Coastal Bank","001Ql00000VLawHIAT","","821.26771500009795"],
-["52056","The Seattle Mariners","001f400000o1Wx9AAE","4 - Secure (Satisfied)","1474.901842411741"],
-["23553","Alice + Olivia LLC","001f400001GZucDAAT","2 - At-Risk (Detractor)","2546.8436423268581"],
-["20","KUIU, Inc.","001f400001KvBhEAAV","4 - Secure (Satisfied)","2337.0338939716521"],
-["64969","Emirates Group","001f4000002YGhVAAW","3 - Stable (Passive)","11172.507924914402"],
-["60852","Hyatt Corporation","001f4000008m6ZfAAI","4 - Secure (Satisfied)","37869.900992084637"],
-["3140","Jackson Family Wines, Inc.","001f400001A4KKtAAN","3 - Stable (Passive)","598.41964023715968"],
-["64463","Cracker Barrel Old Country Store,  Inc.","001f400000u5hrpAAA","4 - Secure (Satisfied)","11293.881929368405"],
-["85430","Floor and Decor Outlets of America, Inc.","001f400001D5Fn5AAF","","4.8993930186131172"],
-["81479","Cell C","001Ql00000hrfDyIAI","3 - Stable (Passive)",""],
-["20736","Saks.com LLC","0015G00001fScoHQAS","2 - At-Risk (Detractor)","24067.152419274651"],
-["728","Dick's Sporting Goods","001f400000Bc9gPAAR","5 - Thriving (Promoter)","165793.23454133808"],
-["16799","Virgin Cruises Intermediate Limited","001f400000FJLBiAAP","2 - At-Risk (Detractor)","2016.7809534473931"],
-["71306","Signet Group Services US, Inc.","001f400000DRkcBAAT","4 - Secure (Satisfied)","5852.5426235209916"],
-["79767","Andmore, LLC","001Ql00000kw1nfIAA","","697.52010891770885"],
-["52054","Football Northwest LLC dba Seattle Seahawks","001f400001Kv9PtAAJ","5 - Thriving (Promoter)","705.75925745627433"],
-["38322","Loblaws Inc.","001f400001KvBSLAA3","4 - Secure (Satisfied)","71798.3942771531"],
-["32567","Caleres, Inc.","001f400000Bc9cMAAR","4 - Secure (Satisfied)","53797.390508763667"],
-["75534","The Salvation Army","0015G00002bADvhQAG","","86.414526402834056"],
-["80672","B&Q Limited","0015G00001V7la1QAB","3 - Stable (Passive)","842.12643117310483"],
-["65170","Baltimore Ravens Limited Partnership","001Ql00000TxDjhIAF","5 - Thriving (Promoter)","3029.4404485821547"],
-["76941","Orion Advisor Solutions, Inc.","001Ql00000ir4loIAA","","274.25254682637541"],
-["78558","The Boca Raton","001Ql00000iUX8ZIAW","","428.6191557263304"],
-["646","Laura's Shoppe (P.V.) Inc.","001f400001KvBiKAAV","","101.2474311261426"],
-["663","The Body Shop","001f400001KvBPaAAN","4 - Secure (Satisfied)","4856.5238398725678"],
-["26308","MillerKnoll, Inc.","0015G00001pfeahQAA","3 - Stable (Passive)","5174.4677980688057"],
-["35338","General Motors LLC","001Ql00000UC933IAD","2 - At-Risk (Detractor)",""],
-["35338","General Motors LLC","001Ql000008b0J0IAI","2 - At-Risk (Detractor)","311.89588562186225"],
-["4159","Home Depot Store Support, Inc.","001f400001KvBRYAA3","5 - Thriving (Promoter)","4401.3444549355372"],
-["46098","TUI InfoTec GmbH","0015G000029PoOAQA0","1 - Critical (Churning)","10431.132468666319"],
-["22089","Leupold & Stevens, Inc.","001f400001KvAHbAAN","3 - Stable (Passive)","2489.7447268674005"],
-["57113","Tilebar","001Ql00000Dl3SoIAJ","2 - At-Risk (Detractor)","1293.3446456123809"],
-["37","WHR Operations, LLC","001f400000Bc9eQAAR","5 - Thriving (Promoter)","96924.189485792493"],
-["65272","Coles Group Limited","001f400000G8fhwAAB","4 - Secure (Satisfied)","25455.016708496292"],
-["21678","Fossil Group","001f400000Bc9cXAAR","2 - At-Risk (Detractor)","4958.254182202525"],
-["27560","Authentic Brands Group LLC","0015G00001fSw1CQAS","2 - At-Risk (Detractor)","1605.6345378253252"],
-["6","Alaska Airlines","001f4000002YGhHAAW","5 - Thriving (Promoter)","59043.425060041016"],
-["22","Macy's, Inc.","001f400001KvBdcAAF","3 - Stable (Passive)","2836.6295270290825"],
-["77543","Worldwide Golf Shops LLC","001f400001KvAKuAAN","","69.510787434081308"],
-["78053","PCS Retirement, LLC","001Ql00000hrPAqIAM","",""],
-["4159","Home Depot Store Support, Inc.","0015G000022mraYQAQ","4 - Secure (Satisfied)","25664.338197761157"],
-["24377","GoTo Foods LLC","001f400000V2qZLAAZ","2 - At-Risk (Detractor)","13401.348121076344"],
-["50845","Manufacturers and Traders Trust Company (M&T)","001f400000Bc9eFAAR","5 - Thriving (Promoter)","65297.97674692094"],
-["653","Patagonia, Inc.","001f400001KvBCyAAN","4 - Secure (Satisfied)","25335.284093412243"],
-["65373","Rural King Supply","001f400001IQhb0AAD","5 - Thriving (Promoter)","3976.3506251461936"],
-["69701","World Travel Holdings (WTH)","0015G00001xDwNGQA0","4 - Secure (Satisfied)","12379.523042852927"],
-["69097","Intrepid Travel Pty Ltd","0015G000027ZDwLQAW","4 - Secure (Satisfied)","1690.5874265531088"],
-["648","Mackenzie-Childs LLC","001f400001KvAJmAAN","5 - Thriving (Promoter)","4990.2194909410264"],
-["43376","Airwair International Limited","0015G00002CCNfMQAX","3 - Stable (Passive)","20882.982871680502"],
-["38000","Bowtie Hospitality, LLC","0015G00002UNRnSQAX","2 - At-Risk (Detractor)","810.46386190624014"],
-["15026","AirStream","001f400001UQ55bAAD","4 - Secure (Satisfied)","850.2976004646423"],
-["38208","National Football League","001f400000rSZyZAAW","4 - Secure (Satisfied)","53981.963867268125"],
-["637","Sporting Life Group (Golf Town Limited)","001f400001KvBi3AAF","2 - At-Risk (Detractor)","6054.3897256266182"],
-["668","Tom's Shoes","001f400001KvB7gAAF","2 - At-Risk (Detractor)","5478.5566795394461"],
-["34931","JD Group","0015G000026M5ROQA0","5 - Thriving (Promoter)","6796.0992331377402"],
-["30","Seattle Soccer LLC, dba Seattle Sounders FC","001f400000AYG3CAAX","5 - Thriving (Promoter)","2315.0623772106078"],
-["66878","Dubai Aviation Corporation","0015G00002fIvKZQA0","4 - Secure (Satisfied)","8396.2311113379837"],
-["32786","Virgin Atlantic Airways Limited","0015G00001oma69QAA","4 - Secure (Satisfied)","5135.9318827015322"],
-["652","Pacific Sunwear of California, Inc.","001f400001KvBNnAAN","4 - Secure (Satisfied)","5474.3562977851116"],
-["23019","The Vail Corporation","001f400000LrjyLAAR","5 - Thriving (Promoter)","39367.869823893168"],
-["15753","Citizen Watch Company of America","001f400001KvBW5AAN","5 - Thriving (Promoter)","3192.5626426051758"],
-["39033","Michael Kors (USA), Inc.","001f4000002YGhdAAG","5 - Thriving (Promoter)","40786.031487932829"],
-["52158","CubeSmart, L.P.","0015G00002UKIF6QAP","5 - Thriving (Promoter)","3196.258508085084"],
-["82083","Scandinavian Airlines","001Ql00000nWJg1IAG","3 - Stable (Passive)","3030.4135698288337"],
-["35","Williams Sonoma Inc.","001f400000AYr4FAAT","4 - Secure (Satisfied)","40848.36312629727"],
-["39439","Haymarket Media Group Limited","0015G00002cm5jqQAA","3 - Stable (Passive)","42105.807570603523"],
-["22","Macy's, Inc.","001f4000002YGfbAAG","4 - Secure (Satisfied)","129495.87466076885"],
-["618","Bonobos, Inc.","001f400001KvBNRAA3","3 - Stable (Passive)","2179.3178023033274"],
-["32349","Paul Fredrick Menstyle, LLC","001f400001KvBL8AAN","4 - Secure (Satisfied)","3234.9887428141496"],
-["8555","SPARC Group LLC","001f400001Kv9g8AAB","4 - Secure (Satisfied)","15694.284204291092"],
-["55279","Group1 Automotive","0015G00001VptZvQAJ","4 - Secure (Satisfied)","4977.3502693144601"],
-["59045","New Look Retailers Limited","001f400001KvBVGAA3","4 - Secure (Satisfied)","15179.184151174957"],
-["19","Kendra Scott, LLC","001f4000002Yv3NAAS","5 - Thriving (Promoter)","18545.218666234392"]
-]}
+{
+"snapshot_date": "2026-07-27",
+"columns": [
+"customer_id",
+"customer_name",
+"account_id",
+"pulse",
+"usage_7d_avg"
+],
+"customers": [
+[
+"4159",
+"Home Depot Store Support, Inc.",
+"001f4000002YGffAAG",
+"4 - Secure (Satisfied)",
+209714.88324080594
+],
+[
+"36458",
+"GoHealth, LLC",
+"0015G00002KcHJPQA3",
+"2 - At-Risk (Detractor)",
+8034.646153768423
+],
+[
+"31333",
+"Oxford Industries, Inc.",
+"001f400001KvAQRAA3",
+"2 - At-Risk (Detractor)",
+7064.92566339013
+],
+[
+"83191",
+"PetSmart",
+"001f4000002YGm9AAG",
+"",
+0.35409931770827113
+],
+[
+"32344",
+"Rhone Apparel, Inc.",
+"001f400001KvAijAAF",
+"4 - Secure (Satisfied)",
+1645.78149115813
+],
+[
+"55885",
+"JB Hi-Fi Group Pty Ltd",
+"0015G000027ZE5EQAW",
+"4 - Secure (Satisfied)",
+15489.19125448254
+],
+[
+"37899",
+"The Metropolitan Museum of Art",
+"0015G00001xEWCwQAO",
+"4 - Secure (Satisfied)",
+1330.6266109248754
+],
+[
+"23",
+"MGM Resorts International",
+"001f4000002YGiXAAW",
+"4 - Secure (Satisfied)",
+30483.741067351577
+],
+[
+"24070",
+"Gerber Products Company",
+"001Ql00000PZHQzIAP",
+"4 - Secure (Satisfied)",
+459.015370446203
+],
+[
+"7",
+"BECU",
+"001f4000002YGi8AAG",
+"2 - At-Risk (Detractor)",
+13952.22529103896
+],
+[
+"641",
+"Johnnie-O",
+"001f400001KvB2BAAV",
+"5 - Thriving (Promoter)",
+1467.170482430231
+],
+[
+"60450",
+"Asset Marketing Services LLC",
+"001f400001Kv9f8AAB",
+"3 - Stable (Passive)",
+340.30246504307604
+],
+[
+"80571",
+"St. George's University",
+"001Ql00000fe3xFIAQ",
+"",
+50.10993938961092
+],
+[
+"31",
+"Servco Pacific Inc.",
+"001f400000hYDMHAA4",
+"3 - Stable (Passive)",
+3568.9474602502764
+],
+[
+"14",
+"The Gap, Inc.",
+"001f4000002YGmEAAW",
+"2 - At-Risk (Detractor)",
+322123.3897830978
+],
+[
+"2630",
+"Deckers Outdoor Corporation",
+"001f400001KvBdEAAV",
+"3 - Stable (Passive)",
+59797.27478988862
+],
+[
+"9",
+"Brooks Sports, Inc.",
+"001f4000004NrPdAAK",
+"4 - Secure (Satisfied)",
+18412.962611631487
+],
+[
+"642",
+"Johnny Was, LLC",
+"001f400001KvBT7AAN",
+"3 - Stable (Passive)",
+3500.8698927834143
+],
+[
+"678",
+"World of Jeans and Tops dba Tillys",
+"001f400001KvBFHAA3",
+"3 - Stable (Passive)",
+4592.692200644292
+],
+[
+"38730",
+"Accent Group Ltd",
+"0015G000027ZE95QAG",
+"5 - Thriving (Promoter)",
+28753.012916407257
+],
+[
+"15340",
+"Smithsonian",
+"001f40000110mFtAAI",
+"4 - Secure (Satisfied)",
+1733.7533230939457
+],
+[
+"657",
+"Shiseido Americas Corporation",
+"0015G00001VpthfQAB",
+"4 - Secure (Satisfied)",
+9534.690710137831
+],
+[
+"48122",
+"Prog Leasing, LLC",
+"0015G00002YyTNUQA3",
+"4 - Secure (Satisfied)",
+4968.797824763565
+],
+[
+"46098",
+"TUI InfoTec GmbH",
+"0015G000029PoOAQA0",
+"1 - Critical (Churning)",
+10948.836380576153
+],
+[
+"57113",
+"Tilebar",
+"001Ql00000Dl3SoIAJ",
+"2 - At-Risk (Detractor)",
+1682.9042497959272
+],
+[
+"5072",
+"First Hawaiian Bank",
+"001f400001JU8VfAAL",
+"2 - At-Risk (Detractor)",
+1585.0528660395323
+],
+[
+"16488",
+"Rogers Communications Canada, Inc",
+"0015G00001WM9GCQA1",
+"2 - At-Risk (Detractor)",
+14217.950445893632
+],
+[
+"16799",
+"Virgin Cruises Intermediate Limited",
+"001f400000FJLBiAAP",
+"2 - At-Risk (Detractor)",
+2031.9474829861733
+],
+[
+"76941",
+"Orion Advisor Solutions, Inc.",
+"001Ql00000ir4loIAA",
+"",
+274.8307600845517
+],
+[
+"646",
+"Laura's Shoppe (P.V.) Inc.",
+"001f400001KvBiKAAV",
+"",
+360.25099556264973
+],
+[
+"65272",
+"Coles Group Limited",
+"001f400000G8fhwAAB",
+"4 - Secure (Satisfied)",
+18112.240074781417
+],
+[
+"52054",
+"Football Northwest LLC dba Seattle Seahawks",
+"001f400001Kv9PtAAJ",
+"5 - Thriving (Promoter)",
+707.8787803947178
+],
+[
+"22089",
+"Leupold & Stevens, Inc.",
+"001f400001KvAHbAAN",
+"3 - Stable (Passive)",
+2433.650735374978
+],
+[
+"36",
+"Endeavour Group Limited",
+"001f400000FhLt8AAF",
+"5 - Thriving (Promoter)",
+54384.56056291583
+],
+[
+"35338",
+"General Motors LLC",
+"001Ql000008b0J0IAI",
+"2 - At-Risk (Detractor)",
+404.41786128753984
+],
+[
+"4159",
+"Home Depot Store Support, Inc.",
+"001f400001KvBRYAA3",
+"5 - Thriving (Promoter)",
+5001.371957173168
+],
+[
+"21884",
+"Tumi, Inc.",
+"001f400001KvBDsAAN",
+"2 - At-Risk (Detractor)",
+3758.992561623237
+],
+[
+"26308",
+"MillerKnoll, Inc.",
+"0015G00001pfeahQAA",
+"3 - Stable (Passive)",
+3644.694723103262
+],
+[
+"79767",
+"Andmore, LLC",
+"001Ql00000kw1nfIAA",
+"",
+653.6820050667644
+],
+[
+"80874",
+"Scheels",
+"001f400001KvBNCAA3",
+"5 - Thriving (Promoter)",
+2849.126846268892
+],
+[
+"81479",
+"Cell C",
+"001Ql00000hrfDyIAI",
+"3 - Stable (Passive)",
+""
+],
+[
+"32567",
+"Caleres, Inc.",
+"001f400000Bc9cMAAR",
+"4 - Secure (Satisfied)",
+59322.50231040072
+],
+[
+"80672",
+"B&Q Limited",
+"0015G00001V7la1QAB",
+"3 - Stable (Passive)",
+192.05205674731684
+],
+[
+"6",
+"Alaska Airlines",
+"001f4000002YGhHAAW",
+"5 - Thriving (Promoter)",
+60889.362394007316
+],
+[
+"76942",
+"Coastal Bank",
+"001Ql00000VLawHIAT",
+"",
+247.40829272111642
+],
+[
+"75534",
+"The Salvation Army",
+"0015G00002bADvhQAG",
+"",
+35.08453859747863
+],
+[
+"55282",
+"Books A Million",
+"001f400001KvBEkAAN",
+"5 - Thriving (Promoter)",
+3888.2834858703786
+],
+[
+"35338",
+"General Motors LLC",
+"001Ql00000UC933IAD",
+"2 - At-Risk (Detractor)",
+1.433607598560879
+],
+[
+"35338",
+"General Motors LLC",
+"001Ql00000Ox1dPIAR",
+"2 - At-Risk (Detractor)",
+383.6581153484821
+],
+[
+"56607",
+"American Honda Motor Co., Inc.",
+"001f400000TGbupAAD",
+"2 - At-Risk (Detractor)",
+119953.75742494036
+],
+[
+"52056",
+"The Seattle Mariners",
+"001f400000o1Wx9AAE",
+"4 - Secure (Satisfied)",
+1437.13048987487
+],
+[
+"27",
+"Nordstrom, Inc.",
+"001f4000002YGhBAAW",
+"2 - At-Risk (Detractor)",
+242432.64429469765
+],
+[
+"20736",
+"Saks.com LLC",
+"0015G00001fScoHQAS",
+"2 - At-Risk (Detractor)",
+21779.787984814222
+],
+[
+"57112",
+"L. L. Bean, Inc.",
+"001f4000002YGgxAAG",
+"5 - Thriving (Promoter)",
+24045.996959689237
+],
+[
+"50638",
+"Choice Hotels International, Inc",
+"001f400000GedyfAAB",
+"2 - At-Risk (Detractor)",
+60669.740510829644
+],
+[
+"728",
+"Dick's Sporting Goods",
+"001f400000Bc9gPAAR",
+"5 - Thriving (Promoter)",
+149123.99403542918
+],
+[
+"3140",
+"Jackson Family Wines, Inc.",
+"001f400001A4KKtAAN",
+"3 - Stable (Passive)",
+689.093863152877
+],
+[
+"71306",
+"Signet Group Services US, Inc.",
+"001f400000DRkcBAAT",
+"4 - Secure (Satisfied)",
+6162.897772284559
+],
+[
+"50643",
+"Fleet Farm Group LLC",
+"001Ql000000gbPnIAI",
+"5 - Thriving (Promoter)",
+8738.533672102576
+],
+[
+"675",
+"Vince, LLC",
+"001f400001KvBEdAAN",
+"2 - At-Risk (Detractor)",
+1989.1158570470448
+],
+[
+"86238",
+"Blain Supply Inc",
+"001f400001Kv9NjAAJ",
+"",
+""
+],
+[
+"28279",
+"EoS Fitness",
+"0015G00001xDwktQAC",
+"3 - Stable (Passive)",
+9196.08412468156
+],
+[
+"37",
+"WHR Operations, LLC",
+"001f400000Bc9eQAAR",
+"5 - Thriving (Promoter)",
+97012.28594883278
+],
+[
+"64969",
+"Emirates Group",
+"001f4000002YGhVAAW",
+"4 - Secure (Satisfied)",
+6699.157566613378
+],
+[
+"55283",
+"Funko, LLC",
+"001f400001Kv9SiAAJ",
+"3 - Stable (Passive)",
+9474.677270368455
+],
+[
+"65170",
+"Baltimore Ravens Limited Partnership",
+"001Ql00000TxDjhIAF",
+"5 - Thriving (Promoter)",
+3559.193740036022
+],
+[
+"78558",
+"The Boca Raton",
+"001Ql00000iUX8ZIAW",
+"",
+433.1203398037089
+],
+[
+"85023",
+"Preferred Travel Group",
+"001Ql00000rqjk6IAA",
+"4 - Secure (Satisfied)",
+""
+],
+[
+"85430",
+"Floor and Decor Outlets of America, Inc.",
+"001f400001D5Fn5AAF",
+"",
+105.0631373417551
+],
+[
+"23553",
+"Alice + Olivia LLC",
+"001f400001GZucDAAT",
+"3 - Stable (Passive)",
+2818.631387527004
+],
+[
+"21678",
+"Fossil Group",
+"001f400000Bc9cXAAR",
+"2 - At-Risk (Detractor)",
+7759.441227281319
+],
+[
+"20",
+"KUIU, Inc.",
+"001f400001KvBhEAAV",
+"4 - Secure (Satisfied)",
+2852.8307412685467
+],
+[
+"60852",
+"Hyatt Corporation",
+"001f4000008m6ZfAAI",
+"4 - Secure (Satisfied)",
+38721.958140137496
+],
+[
+"38322",
+"Loblaws Inc.",
+"001f400001KvBSLAA3",
+"4 - Secure (Satisfied)",
+81555.7670750304
+],
+[
+"663",
+"The Body Shop",
+"001f400001KvBPaAAN",
+"4 - Secure (Satisfied)",
+4169.429706200103
+],
+[
+"27560",
+"Authentic Brands Group LLC",
+"0015G00001fSw1CQAS",
+"2 - At-Risk (Detractor)",
+1594.4362035078318
+],
+[
+"64463",
+"Cracker Barrel Old Country Store,  Inc.",
+"001f400000u5hrpAAA",
+"4 - Secure (Satisfied)",
+12850.045371282758
+],
+[
+"38000",
+"Bowtie Hospitality, LLC",
+"0015G00002UNRnSQAX",
+"2 - At-Risk (Detractor)",
+1311.447053561226
+],
+[
+"24377",
+"GoTo Foods LLC",
+"001f400000V2qZLAAZ",
+"2 - At-Risk (Detractor)",
+18200.85620970719
+],
+[
+"668",
+"Tom's Shoes",
+"001f400001KvB7gAAF",
+"2 - At-Risk (Detractor)",
+4543.079145305382
+],
+[
+"65373",
+"Rural King Supply",
+"001f400001IQhb0AAD",
+"5 - Thriving (Promoter)",
+3198.941562601532
+],
+[
+"39033",
+"Michael Kors (USA), Inc.",
+"001f4000002YGhdAAG",
+"5 - Thriving (Promoter)",
+45657.94725668268
+],
+[
+"30",
+"Seattle Soccer LLC, dba Seattle Sounders FC",
+"001f400000AYG3CAAX",
+"5 - Thriving (Promoter)",
+2462.992496823367
+],
+[
+"637",
+"Sporting Life Group (Golf Town Limited)",
+"001f400001KvBi3AAF",
+"2 - At-Risk (Detractor)",
+6596.863067083903
+],
+[
+"648",
+"Mackenzie-Childs LLC",
+"001f400001KvAJmAAN",
+"5 - Thriving (Promoter)",
+4480.332273350877
+],
+[
+"66878",
+"Dubai Aviation Corporation",
+"0015G00002fIvKZQA0",
+"4 - Secure (Satisfied)",
+9149.357745080586
+],
+[
+"34931",
+"JD Group",
+"0015G000026M5ROQA0",
+"5 - Thriving (Promoter)",
+7079.910129520516
+],
+[
+"15753",
+"Citizen Watch Company of America",
+"001f400001KvBW5AAN",
+"5 - Thriving (Promoter)",
+2621.7554463558413
+],
+[
+"82083",
+"Scandinavian Airlines",
+"001Ql00000nWJg1IAG",
+"3 - Stable (Passive)",
+2888.1042682783236
+],
+[
+"22",
+"Macy's, Inc.",
+"001f400001KvBdcAAF",
+"3 - Stable (Passive)",
+2799.917107866459
+],
+[
+"77543",
+"Worldwide Golf Shops LLC",
+"001f400001KvAKuAAN",
+"",
+54.273413900696866
+],
+[
+"653",
+"Patagonia, Inc.",
+"001f400001KvBCyAAN",
+"4 - Secure (Satisfied)",
+29600.130644251996
+],
+[
+"50845",
+"Manufacturers and Traders Trust Company (M&T)",
+"001f400000Bc9eFAAR",
+"5 - Thriving (Promoter)",
+63429.15841001113
+],
+[
+"78053",
+"PCS Retirement, LLC",
+"001Ql00000hrPAqIAM",
+"",
+""
+],
+[
+"59045",
+"New Look Retailers Limited",
+"001f400001KvBVGAA3",
+"4 - Secure (Satisfied)",
+11672.588556534172
+],
+[
+"43376",
+"Airwair International Limited",
+"0015G00002CCNfMQAX",
+"3 - Stable (Passive)",
+25446.375071595085
+],
+[
+"22",
+"Macy's, Inc.",
+"001f4000002YGfbAAG",
+"4 - Secure (Satisfied)",
+135564.1406417251
+],
+[
+"69701",
+"World Travel Holdings (WTH)",
+"0015G00001xDwNGQA0",
+"4 - Secure (Satisfied)",
+11905.153851588728
+],
+[
+"23019",
+"The Vail Corporation",
+"001f400000LrjyLAAR",
+"5 - Thriving (Promoter)",
+39779.37148812695
+],
+[
+"39439",
+"Haymarket Media Group Limited",
+"0015G00002cm5jqQAA",
+"3 - Stable (Passive)",
+37303.1575870281
+],
+[
+"618",
+"Bonobos, Inc.",
+"001f400001KvBNRAA3",
+"3 - Stable (Passive)",
+2237.4545729695337
+],
+[
+"38208",
+"National Football League",
+"001f400000rSZyZAAW",
+"4 - Secure (Satisfied)",
+53414.92758167196
+],
+[
+"8555",
+"SPARC Group LLC",
+"001f400001Kv9g8AAB",
+"4 - Secure (Satisfied)",
+14749.170482636162
+],
+[
+"4159",
+"Home Depot Store Support, Inc.",
+"0015G000022mraYQAQ",
+"4 - Secure (Satisfied)",
+23000.927670133246
+],
+[
+"69097",
+"Intrepid Travel Pty Ltd",
+"0015G000027ZDwLQAW",
+"4 - Secure (Satisfied)",
+1282.520197502097
+],
+[
+"15026",
+"AirStream",
+"001f400001UQ55bAAD",
+"4 - Secure (Satisfied)",
+845.5469001972116
+],
+[
+"652",
+"Pacific Sunwear of California, Inc.",
+"001f400001KvBNnAAN",
+"4 - Secure (Satisfied)",
+6157.895410215439
+],
+[
+"19",
+"Kendra Scott, LLC",
+"001f4000002Yv3NAAS",
+"4 - Secure (Satisfied)",
+19682.211486801716
+],
+[
+"35",
+"Williams Sonoma Inc.",
+"001f400000AYr4FAAT",
+"4 - Secure (Satisfied)",
+41064.768386381795
+],
+[
+"55279",
+"Group1 Automotive",
+"0015G00001VptZvQAJ",
+"4 - Secure (Satisfied)",
+3275.961441411379
+],
+[
+"52158",
+"CubeSmart, L.P.",
+"0015G00002UKIF6QAP",
+"5 - Thriving (Promoter)",
+3590.7939246570136
+],
+[
+"32786",
+"Virgin Atlantic Airways Limited",
+"0015G00001oma69QAA",
+"4 - Secure (Satisfied)",
+5869.541872813213
+],
+[
+"32349",
+"Paul Fredrick Menstyle, LLC",
+"001f400001KvBL8AAN",
+"4 - Secure (Satisfied)",
+4923.004783442013
+]
+]
+}
