@@ -251,9 +251,27 @@ function isCurrentFY(d){ return !!d.fq && d.fq.startsWith(CURRENT_FY_PREFIX); }
 
 const LATE_STAGES = new Set(['Stage 4 – Proposal & Plan', 'Stage 4 – Selection', 'Stage 5 – Negotiation']);
 
-// FY27 = Feb 2026 – Jan 2027. Closed-actuals months load through the last closed
-// month (June); the current open quarter is Q2 (May/Jun/Jul).
-const FYTD_MONTHS = ['2026-02-28','2026-03-31','2026-04-30','2026-05-31','2026-06-30'];
+// FYTD window (Amperity FY starts Feb 1). Computed from today's actual date on every
+// page load, so closed actuals AND quota YTD always extend through the current month
+// automatically — no manual monthly edits needed here. January belongs to the prior FY.
+function computeFYTD(){
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth(); // m: 0=Jan
+  const fyStartYear = m >= 1 ? y : y - 1; // Feb onward stays in this calendar year's FY
+  const monthStarts = [], monthEnds = [];
+  let cy = fyStartYear, cm = 1; // start at February (month index 1)
+  while (true) {
+    const mm = String(cm+1).padStart(2,'0');
+    monthStarts.push(`${cy}-${mm}-01`);
+    const lastDay = new Date(cy, cm+1, 0).getDate();
+    monthEnds.push(`${cy}-${mm}-${String(lastDay).padStart(2,'0')}`);
+    if (cy === y && cm === m) break; // stop once we've included the current month
+    cm++; if (cm > 11) { cm = 0; cy++; }
+  }
+  return { monthStarts, monthEnds };
+}
+const { monthStarts: FYTD_MONTH_STARTS, monthEnds: FYTD_MONTH_ENDS } = computeFYTD();
+const FYTD_MONTHS = FYTD_MONTH_ENDS;
 const QUARTERS = [
   { label: 'Q2 FY27 (current)', fq: '2027 Q2', months: ['2026-05-01','2026-06-01','2026-07-01'] },
   { label: 'Q3 FY27',            fq: '2027 Q3', months: ['2026-08-01','2026-09-01','2026-10-01'] },
@@ -317,7 +335,7 @@ const Q = {
     SELECT CLOSE_MONTH, OPPORTUNITY_OWNER, COALESCE(ACCOUNT_RVP,'') as ACCOUNT_RVP,
            SUM(CLOSED_ARR) as CLOSED_ARR
     FROM load.finance_sandbox.mrp_sales_effect
-    WHERE CLOSE_MONTH BETWEEN '2026-02-28' AND '2026-06-30'
+    WHERE CLOSE_MONTH BETWEEN '${FYTD_MONTH_ENDS[0]}' AND '${FYTD_MONTH_ENDS[FYTD_MONTH_ENDS.length-1]}'
       AND REP_TYPE = 'AE'
     GROUP BY CLOSE_MONTH, OPPORTUNITY_OWNER, ACCOUNT_RVP`,
 
@@ -420,7 +438,7 @@ function preProcessClosed(rows){
 function preProcessTargets(rows){
   const ae = {}, aeManager = {}, aeAnnual = {}, aeYtd = {}, aeQtr = {};
   const rvpAnnual = {}, rvpYtd = {}, rvpQtr = {};
-  const YTD_MONTHS = new Set(['2026-02-01','2026-03-01','2026-04-01','2026-05-01','2026-06-01']);
+  const YTD_MONTHS = new Set(FYTD_MONTH_STARTS);
   for (const r of rows) {
     const name = alias(r.NAME||''), val = +(r.TARGET||0), mgr = alias(r.MANAGER_NAME||'');
     const m = parseDate(r.MONTH_START);
