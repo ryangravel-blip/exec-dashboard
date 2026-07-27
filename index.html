@@ -534,23 +534,23 @@ function buildRepTable(deals, closed, tgt){
   });
 
   let h = `<colgroup>
-    <col style="width:15%">
-    <col style="width:7%"><col style="width:7%"><col style="width:6%">
-    <col style="width:5.5%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:5.5%">
-    <col style="width:8%"><col style="width:7%">
-    <col style="width:7%"><col style="width:7%"><col style="width:8%">
+    <col style="width:14%">
+    <col style="width:6.5%"><col style="width:6.5%"><col style="width:6%">
+    <col style="width:5%"><col style="width:5%"><col style="width:5%"><col style="width:5%"><col style="width:5%">
+    <col style="width:7.5%"><col style="width:7%"><col style="width:6.5%">
+    <col style="width:6.5%"><col style="width:6.5%"><col style="width:7.5%">
   </colgroup>
   <thead>
   <tr class="grp-hdr">
     <th class="th-lbl grp-rep" rowspan="2">Rep</th>
     <th class="grp-1" colspan="3">YTD vs. quota</th>
-    <th class="grp-2" colspan="7">Open pipeline — this FY</th>
+    <th class="grp-2" colspan="8">Open pipeline — this FY</th>
     <th class="grp-3" colspan="3">Total pipeline — all dates</th>
   </tr>
   <tr>
     <th>Closed FYTD</th><th>Quota YTD</th><th>% to Quota</th>
     <th>S1</th><th>S2</th><th>S3</th><th>S4</th><th>S5</th>
-    <th>Open Pipe</th><th>FY Coverage</th>
+    <th>Open Pipe</th><th>Gap to Quota</th><th>FY Coverage</th>
     <th>Total Pipe</th><th>Annual Quota</th><th>Annual Coverage</th>
   </tr>
   </thead><tbody>`;
@@ -577,7 +577,7 @@ function buildRepTable(deals, closed, tgt){
         <td class="lbl-indent">${rep}</td>
         <td>${K(cl)}</td><td>${ytdq?K(ytdq):'—'}</td><td>${pctToQuota!=null?PCT(pctToQuota):'—'}</td>
         <td>${s1?K(s1):'—'}</td><td>${s2?K(s2):'—'}</td><td>${s3?K(s3):'—'}</td><td>${s4?K(s4):'—'}</td><td>${s5?K(s5):'—'}</td>
-        <td>${K(openFY)}</td><td class="${covClass(covFY)}">${covFY!=null?covFY.toFixed(1)+'x':'—'}</td>
+        <td>${K(openFY)}</td><td>${annual?K(remaining):'—'}</td><td class="${covClass(covFY)}">${covFY!=null?covFY.toFixed(1)+'x':'—'}</td>
         <td>${K(allTime)}</td><td>${annual?K(annual):'—'}</td>
         <td class="${covClass(covAnnual)}">${covAnnual!=null?covAnnual.toFixed(1)+'x':'—'}</td>
       </tr>`;
@@ -597,7 +597,7 @@ function buildRepTable(deals, closed, tgt){
       <td class="lbl-sub">${mgr}</td>
       <td>${K(mClosed)}</td><td>${mYtdQ?K(mYtdQ):'—'}</td><td>${mPctToQuota!=null?PCT(mPctToQuota):'—'}</td>
       <td>${mS[0]?K(mS[0]):'—'}</td><td>${mS[1]?K(mS[1]):'—'}</td><td>${mS[2]?K(mS[2]):'—'}</td><td>${mS[3]?K(mS[3]):'—'}</td><td>${mS[4]?K(mS[4]):'—'}</td>
-      <td>${K(mOpenFY)}</td><td class="${covClass(mCovFY)}">${mCovFY!=null?mCovFY.toFixed(1)+'x':'—'}</td>
+      <td>${K(mOpenFY)}</td><td>${mAnnual?K(mRemaining):'—'}</td><td class="${covClass(mCovFY)}">${mCovFY!=null?mCovFY.toFixed(1)+'x':'—'}</td>
       <td>${K(mAllTime)}</td><td>${mAnnual?K(mAnnual):'—'}</td>
       <td class="${covClass(mCovAnnual)}">${mCovAnnual!=null?mCovAnnual.toFixed(1)+'x':'—'}</td>
     </tr>`;
@@ -613,7 +613,7 @@ function buildRepTable(deals, closed, tgt){
     <td class="lbl-sub">Total</td>
     <td>${K(gT.closed)}</td><td>${K(gT.ytdq)}</td><td>${gPctToQuota!=null?PCT(gPctToQuota):'—'}</td>
     <td>${K(gT.s[0])}</td><td>${K(gT.s[1])}</td><td>${K(gT.s[2])}</td><td>${K(gT.s[3])}</td><td>${K(gT.s[4])}</td>
-    <td>${K(gT.openFY)}</td><td class="${covClass(gCovFY)}">${gCovFY!=null?gCovFY.toFixed(1)+'x':'—'}</td>
+    <td>${K(gT.openFY)}</td><td>${K(gRemaining)}</td><td class="${covClass(gCovFY)}">${gCovFY!=null?gCovFY.toFixed(1)+'x':'—'}</td>
     <td>${K(gT.allTime)}</td><td>${K(gT.annual)}</td>
     <td class="${covClass(gCovAnnual)}">${gCovAnnual!=null?gCovAnnual.toFixed(1)+'x':'—'}</td>
   </tr>`;
