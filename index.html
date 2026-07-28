@@ -89,6 +89,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .health-green { background: #15803d; }
 .health-unk { background: #d1d5db; }
 
+.health-legend { display: flex; gap: 28px; flex-wrap: wrap; padding: 14px 18px; }
+.hl-col { flex: 1; min-width: 280px; }
+.hl-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: #6b7280; margin-bottom: 8px; }
+.hl-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px; font-size: 11.5px; line-height: 1.4; }
+.hl-row .health-dot { margin-top: 2px; }
+.hl-key { font-weight: 700; color: #1a1a2e; min-width: 92px; flex: none; }
+.hl-wt { color: #80C7D1; font-weight: 700; min-width: 30px; flex: none; }
+.hl-def { color: #6b7280; }
+
 .table-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; margin-bottom: 20px; }
 .chart-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 16px; margin-bottom: 20px; height: 260px; }
 
@@ -188,6 +197,21 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
   </div>
 
   <div class="section-title">Customer health <span class="hint">ARR base from Salesforce · P/A/M/E + overall score and health_color from PROD.ACCOUNT360.ACCOUNT_HEALTH (latest snapshot)</span></div>
+  <div class="table-card health-legend">
+    <div class="hl-col">
+      <div class="hl-title">PAME score components (weighted average → Overall Score)</div>
+      <div class="hl-row"><span class="hl-key">P — Protect</span><span class="hl-wt">50%</span><span class="hl-def">Churn risk: usage health, renewal status, workflow activity</span></div>
+      <div class="hl-row"><span class="hl-key">M — Manage</span><span class="hl-wt">25%</span><span class="hl-def">Relationship health: call sentiment, exec engagement, multithreading</span></div>
+      <div class="hl-row"><span class="hl-key">A — Accelerate</span><span class="hl-wt">20%</span><span class="hl-def">Adoption: consumption growth, platform/workflow engagement</span></div>
+      <div class="hl-row"><span class="hl-key">E — Expand</span><span class="hl-wt">5%</span><span class="hl-def">Growth signals: renewal count, upsells, active add-ons</span></div>
+    </div>
+    <div class="hl-col">
+      <div class="hl-title">Overall grade color rubric</div>
+      <div class="hl-row"><span class="health-dot health-red"></span><span class="hl-def">Any auto-red trigger fires — login collapse, bad renewal, workflow gone dark, senior job change, or 2+ loose risk flags — regardless of score, or overall score &lt; 40</span></div>
+      <div class="hl-row"><span class="health-dot health-yellow"></span><span class="hl-def">No auto-red trigger, but overall score &lt; 65, P score &lt; 55, or any of A/M/E score &lt; 30</span></div>
+      <div class="hl-row"><span class="health-dot health-green"></span><span class="hl-def">No auto-red trigger and none of the yellow conditions above</span></div>
+    </div>
+  </div>
   <div class="custarr-controls">
     <input type="text" id="chSearch" placeholder="Search customers…" oninput="filterHealthTable()">
     <label>Type: <select id="chTypeFilter" onchange="filterHealthTable()">
