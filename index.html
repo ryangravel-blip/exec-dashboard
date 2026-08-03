@@ -78,6 +78,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .custarr-table tbody tr:hover td { background: #ebf4ff !important; }
 .custarr-table tbody tr:nth-child(even) td { background: #fcfcfc; }
 .custarr-count { font-size: 11px; color: #9ba3af; margin-top: 8px; }
+.rep-footnote { font-size: 11px; color: #9ba3af; margin: -12px 0 20px; line-height: 1.5; }
 .contract-end-soon { color: #dc2626; font-weight: 600; }
 .contract-end-near  { color: #d97706; font-weight: 600; }
 .var-good  { color: #15803d; font-weight: 600; }
@@ -179,6 +180,7 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
 
   <div class="section-title">Rep productivity <span class="hint">Open pipe by stage, closed FYTD, coverage vs. remaining quota</span></div>
   <div class="table-card" style="overflow-x:auto"><table id="repTable"></table></div>
+  <div id="repTableFootnote" class="rep-footnote"></div>
 </div>
 
 <div class="tab-pane" id="tab-health">
@@ -362,13 +364,29 @@ const Q = {
       )
     ORDER BY ARR DESC`,
 
+  // REP_TYPE is almost always 'AE', but a handful of deals are closed by an RVP
+  // acting as the opportunity owner themselves (REP_TYPE='Other' in that case) —
+  // include those too so an RVP's own closed deals count toward their team's
+  // actuals. rvpSelfOwnedDeals (below) pulls the deal-level detail behind these
+  // for the footnote under the Rep Productivity table.
   closedFYTD: `
     SELECT CLOSE_MONTH, OPPORTUNITY_OWNER, COALESCE(ACCOUNT_RVP,'') as ACCOUNT_RVP,
            SUM(CLOSED_ARR) as CLOSED_ARR
     FROM load.finance_sandbox.mrp_sales_effect
     WHERE CLOSE_MONTH BETWEEN '${FYTD_MONTH_ENDS[0]}' AND '${FYTD_MONTH_ENDS[FYTD_MONTH_ENDS.length-1]}'
-      AND REP_TYPE = 'AE'
+      AND (REP_TYPE = 'AE' OR ACCOUNT_RVP = OPPORTUNITY_OWNER)
     GROUP BY CLOSE_MONTH, OPPORTUNITY_OWNER, ACCOUNT_RVP`,
+
+  // Deal-level detail behind any closed deal where the RVP is also the opportunity
+  // owner — used only to footnote the Rep Productivity table so it's clear why an
+  // AE-labeled row named after an RVP (their own self-closed deal) is in there.
+  rvpSelfOwnedDeals: `
+    SELECT CLOSE_MONTH, OPPORTUNITY_OWNER, OPPORTUNITY_NAME, ACCOUNT_NAME, CLOSED_ARR
+    FROM load.finance_sandbox.mrp_sales_effect
+    WHERE CLOSE_MONTH BETWEEN '${FYTD_MONTH_ENDS[0]}' AND '${FYTD_MONTH_ENDS[FYTD_MONTH_ENDS.length-1]}'
+      AND ACCOUNT_RVP = OPPORTUNITY_OWNER
+      AND CLOSED_ARR <> 0
+    ORDER BY CLOSE_MONTH`,
 
   salesTargets: `
     SELECT ROLE_TYPE, NAME, MANAGER_NAME, MONTH_START, SUM(MONTHLY_QUOTA_FROM_PRORATED) as TARGET
@@ -456,6 +474,15 @@ function preProcessClosed(rows){
     if (mgr) reps[rep].mgr = mgr;
   }
   return reps;
+}
+
+function preProcessRvpSelfDeals(rows){
+  return rows
+    .map(r => ({
+      owner: alias(r.OPPORTUNITY_OWNER), name: r.OPPORTUNITY_NAME, account: r.ACCOUNT_NAME,
+      closeMonth: parseDate(r.CLOSE_MONTH), arr: +(r.CLOSED_ARR||0),
+    }))
+    .filter(d => !EXCLUDED_REPS.has(d.owner));
 }
 
 function preProcessTargets(rows){
@@ -561,7 +588,7 @@ function buildCards(deals, closed, tgt){
     </div>`).join('');
 }
 
-function buildRepTable(deals, closed, tgt){
+function buildRepTable(deals, closed, tgt, rvpSelfDeals){
   const byRep = {};
   for (const d of deals) {
     if (!byRep[d.owner]) byRep[d.owner] = { rvp: d.rvp, stages:{}, total:0, fyTotal:0 };
@@ -672,6 +699,20 @@ function buildRepTable(deals, closed, tgt){
   </tr>`;
   h += `</tbody>`;
   document.getElementById('repTable').innerHTML = h;
+
+  // Footnote: deals where the RVP was also the Opportunity Owner. These are
+  // included in REP_TYPE-based actuals above (see Q.closedFYTD), which is why
+  // an RVP's row total can exceed the sum of their AEs' rows — call it out
+  // explicitly so it doesn't read as a rollup bug.
+  const fnEl = document.getElementById('repTableFootnote');
+  if (rvpSelfDeals && rvpSelfDeals.length) {
+    const items = rvpSelfDeals.map(d =>
+      `${d.owner} — ${d.name} (${d.account}) — ${K(d.arr)} — closed ${fmtDateShort(d.closeMonth)}`
+    ).join('; ');
+    fnEl.innerHTML = `Note: ${rvpSelfDeals.length} deal${rvpSelfDeals.length>1?'s':''} closed where the RVP was also the Opportunity Owner ${rvpSelfDeals.length>1?'are':'is'} included in that RVP's actuals above (this is why an RVP's total can exceed the sum of their AEs' totals): ${items}`;
+  } else {
+    fnEl.innerHTML = '';
+  }
 }
 
 let healthData = [];
@@ -779,17 +820,18 @@ async function loadAll() {
     msg.textContent = 'Connecting to Snowflake…';
     await waitForCowork();
     msg.textContent = 'Fetching pipeline, closed deals, quotas, and customer health…';
-    const [pipeRows, closedRows, tgtRows, healthRows] = await Promise.all([
-      execSQL(Q.pipeline), execSQL(Q.closedFYTD), execSQL(Q.salesTargets), execSQL(Q.customerHealth)
+    const [pipeRows, closedRows, tgtRows, healthRows, rvpSelfRows] = await Promise.all([
+      execSQL(Q.pipeline), execSQL(Q.closedFYTD), execSQL(Q.salesTargets), execSQL(Q.customerHealth), execSQL(Q.rvpSelfOwnedDeals)
     ]);
     msg.textContent = 'Building dashboard…';
     const deals = preProcessPipeline(pipeRows);
     const closed = preProcessClosed(closedRows);
     const tgt = preProcessTargets(tgtRows);
     const health = preProcessCustomerHealth(healthRows);
+    const rvpSelfDeals = preProcessRvpSelfDeals(rvpSelfRows);
 
     buildCards(deals, closed, tgt);
-    buildRepTable(deals, closed, tgt);
+    buildRepTable(deals, closed, tgt, rvpSelfDeals);
     buildHealthTable(health);
 
     document.getElementById('loadingOverlay').style.display = 'none';
