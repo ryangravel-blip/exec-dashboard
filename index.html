@@ -145,6 +145,7 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
   <div class="tab-nav">
     <button class="tab-btn active" id="tabBtn-sales" onclick="showTab('sales')">Sales Performance</button>
     <button class="tab-btn" id="tabBtn-health" onclick="showTab('health')">Customer Health</button>
+    <button class="tab-btn" id="tabBtn-consumption" onclick="showTab('consumption')">Consumption Health</button>
   </div>
   <div class="live-badge"><span class="live-dot"></span> Live · refreshes on load</div>
 </div>
@@ -263,6 +264,24 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
     <table class="custarr-table" id="healthTable"></table>
   </div>
   <div class="custarr-count" id="ch-count"></div>
+</div>
+
+<div class="tab-pane" id="tab-consumption">
+  <div class="custarr-summary">
+    <div class="custarr-stat"><div class="cs-label">Consumption Customers</div><div class="cs-value" id="con-total">—</div><div class="cs-sub">active capacity contract</div></div>
+    <div class="custarr-stat"><div class="cs-label">Total Capacity ARR</div><div class="cs-value" id="con-capacity">—</div><div class="cs-sub">current contract year</div></div>
+    <div class="custarr-stat"><div class="cs-label">Avg % of Capacity Used</div><div class="cs-value" id="con-avgpct">—</div><div class="cs-sub">YTD burn ÷ capacity</div></div>
+    <div class="custarr-stat"><div class="cs-label">Trending &gt;110% Pace</div><div class="cs-value" id="con-overpace">—</div><div class="cs-sub">4-wk pace vs. target</div></div>
+  </div>
+
+  <div class="section-title">Consumption health <span class="hint">Capacity vs. burn from PROD.DEALSBASE.CONSUMPTION_BUDGET · 4-wk pace/trend derived from PROD.FISHBOWL.AMPS usage at each account's own $/usage rate</span></div>
+  <div class="custarr-controls">
+    <input type="text" id="conSearch" placeholder="Search customers…" oninput="filterConsumptionTable()">
+  </div>
+  <div class="table-card" style="overflow-x:auto; max-height:640px; overflow-y:auto;">
+    <table class="custarr-table" id="consumptionTable"></table>
+  </div>
+  <div class="custarr-count" id="con-count"></div>
 </div>
 
 </div>
@@ -446,6 +465,90 @@ const Q = {
     LEFT JOIN sf_vertical v ON c.CUSTOMER_ID = v.CUSTOMER_ID
     LEFT JOIN health h ON c.ACCOUNT_ID = h.ACCOUNT_ID
     ORDER BY c.ARR DESC`,
+
+  // Consumption Health: current-contract-year capacity vs. burn per (customer, account),
+  // one row per account — aggregated to the customer level in preProcessConsumption().
+  // Contract "years" aren't flagged in the data, so year_start/end_tenure derive the
+  // current 12-month window from CONSUMPTION_MONTH_TENURE. Only customers with a
+  // currently-active DEAL_ID row this month appear here, which naturally excludes
+  // subscription-only customers.
+  consumptionCapacity: `
+    WITH sf_customers AS (
+      SELECT cam.CUSTOMER_ID, cam.CUSTOMER_NAME, cam.ACCOUNT_ID
+      FROM PROD.DEALSBASE.CUSTOMER_ACCOUNT_MAP cam
+      JOIN PROD.SALESFORCE.ACCOUNTS a ON cam.ACCOUNT_ID = a.ACCOUNT_ID
+      WHERE a.TYPE = 'Customer'
+      GROUP BY cam.CUSTOMER_ID, cam.CUSTOMER_NAME, cam.ACCOUNT_ID
+    ),
+    sf_vertical AS (
+      SELECT cam.CUSTOMER_ID, a.VERTICAL, COUNT(*) AS cnt
+      FROM PROD.DEALSBASE.CUSTOMER_ACCOUNT_MAP cam
+      JOIN PROD.SALESFORCE.ACCOUNTS a ON cam.ACCOUNT_ID = a.ACCOUNT_ID
+      WHERE a.VERTICAL IS NOT NULL AND a.VERTICAL != ''
+      GROUP BY cam.CUSTOMER_ID, a.VERTICAL
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY cam.CUSTOMER_ID ORDER BY cnt DESC) = 1
+    ),
+    current_deal AS (
+      SELECT ACCOUNT_ID, DEAL_ID, CONSUMPTION_MONTH_TENURE AS tenure_now, PRODUCT_C_ARR,
+             CONSUMPTION_START_DT, CONSUMPTION_END_DT
+      FROM PROD.DEALSBASE.CONSUMPTION_BUDGET
+      WHERE MONTH_BEGIN_DT = DATE_TRUNC('month', CURRENT_DATE())
+    ),
+    year_bounds AS (
+      SELECT *, FLOOR((tenure_now-1)/12)*12 + 1 AS year_start_tenure, FLOOR((tenure_now-1)/12)*12 + 12 AS year_end_tenure
+      FROM current_deal
+    ),
+    burn AS (
+      SELECT cb.ACCOUNT_ID, cb.DEAL_ID, SUM(cb.CONSUMPTION_AMOUNT) AS burned_this_year
+      FROM PROD.DEALSBASE.CONSUMPTION_BUDGET cb
+      JOIN year_bounds yb ON cb.ACCOUNT_ID = yb.ACCOUNT_ID AND cb.DEAL_ID = yb.DEAL_ID
+        AND cb.CONSUMPTION_MONTH_TENURE BETWEEN yb.year_start_tenure AND yb.year_end_tenure
+      GROUP BY cb.ACCOUNT_ID, cb.DEAL_ID
+    )
+    SELECT c.CUSTOMER_ID, c.CUSTOMER_NAME, c.ACCOUNT_ID,
+           COALESCE(v.VERTICAL,'') AS VERTICAL,
+           yb.PRODUCT_C_ARR AS CAPACITY_ARR,
+           yb.CONSUMPTION_START_DT, yb.CONSUMPTION_END_DT,
+           b.burned_this_year AS BURNED_THIS_YEAR
+    FROM sf_customers c
+    JOIN year_bounds yb ON c.ACCOUNT_ID = yb.ACCOUNT_ID
+    JOIN burn b ON yb.ACCOUNT_ID = b.ACCOUNT_ID AND yb.DEAL_ID = b.DEAL_ID
+    LEFT JOIN sf_vertical v ON c.CUSTOMER_ID = v.CUSTOMER_ID`,
+
+  // Rate-input for the 4-Wk Pace/Trend derivation: dollarized monthly consumption vs.
+  // raw AMPS usage for the trailing 3 complete months (excludes the current partial
+  // month). Used to derive each account's own $/usage rate in preProcessConsumption().
+  consumptionRateInputs: `
+    WITH cb AS (
+      SELECT ACCOUNT_ID, MONTH_BEGIN_DT, SUM(CONSUMPTION_AMOUNT) AS CONSUMPTION_AMOUNT
+      FROM PROD.DEALSBASE.CONSUMPTION_BUDGET
+      WHERE MONTH_BEGIN_DT >= DATEADD(month, -3, DATE_TRUNC('month', CURRENT_DATE()))
+        AND MONTH_BEGIN_DT < DATE_TRUNC('month', CURRENT_DATE())
+      GROUP BY ACCOUNT_ID, MONTH_BEGIN_DT
+    ),
+    amps AS (
+      SELECT SALESFORCE_ACCOUNT_ID AS ACCOUNT_ID, DATE_TRUNC('month', USAGE_DATE) AS MONTH_BEGIN_DT, SUM(AMPS_AMOUNT) AS AMPS_TOTAL
+      FROM PROD.FISHBOWL.AMPS
+      WHERE COALESCE(TENANT_IS_SANDBOX, FALSE) = FALSE
+        AND USAGE_DATE >= DATEADD(month, -3, DATE_TRUNC('month', CURRENT_DATE()))
+        AND USAGE_DATE < DATE_TRUNC('month', CURRENT_DATE())
+      GROUP BY 1, 2
+    )
+    SELECT cb.ACCOUNT_ID, cb.MONTH_BEGIN_DT, cb.CONSUMPTION_AMOUNT, amps.AMPS_TOTAL
+    FROM cb JOIN amps ON cb.ACCOUNT_ID = amps.ACCOUNT_ID AND cb.MONTH_BEGIN_DT = amps.MONTH_BEGIN_DT
+    WHERE amps.AMPS_TOTAL > 0`,
+
+  // Weekly raw usage for the trailing 9 completed weeks (deliberately excludes the
+  // current, still-in-progress week) — powers the 4-Wk Pace/Trend columns once
+  // converted to dollars via the rate derived from consumptionRateInputs above.
+  consumptionWeeklyUsage: `
+    SELECT SALESFORCE_ACCOUNT_ID AS ACCOUNT_ID, DATE_TRUNC('week', USAGE_DATE) AS WK, SUM(AMPS_AMOUNT) AS AMPS
+    FROM PROD.FISHBOWL.AMPS
+    WHERE COALESCE(TENANT_IS_SANDBOX, FALSE) = FALSE
+      AND USAGE_DATE >= DATEADD(week, -9, DATE_TRUNC('week', CURRENT_DATE()))
+      AND USAGE_DATE < DATE_TRUNC('week', CURRENT_DATE())
+    GROUP BY 1, 2
+    ORDER BY 1, 2`,
 };
 
 // ─── PRE-PROCESS ──────────────────────────────────────
@@ -532,6 +635,107 @@ function preProcessCustomerHealth(rows){
       overallScore: num(r.OVERALL_SCORE), healthColor: (r.HEALTH_COLOR||'').toLowerCase(),
     };
   });
+}
+
+// Consumption Health: capRows = one row per (customer, account) from Q.consumptionCapacity;
+// rateRows = one row per (account, month) from Q.consumptionRateInputs; weekRows = one row
+// per (account, week) from Q.consumptionWeeklyUsage. Aggregates to customer level per the
+// spec: sum capacity/burn/current4/prior4/target4 dollars across a customer's accounts
+// FIRST, then compute pct/pace/wow ratios from the summed figures (never average ratios).
+function preProcessConsumption(capRows, rateRows, weekRows) {
+  // 1) Per-account $/usage rate from trailing 3 complete months, + volatility flag.
+  const ratesByAccount = {};
+  for (const r of rateRows) {
+    const amps = +(r.AMPS_TOTAL || 0);
+    if (!amps) continue;
+    const acct = r.ACCOUNT_ID;
+    (ratesByAccount[acct] = ratesByAccount[acct] || []).push(+(r.CONSUMPTION_AMOUNT || 0) / amps);
+  }
+  const rateInfo = {};
+  for (const acct in ratesByAccount) {
+    const rates = ratesByAccount[acct];
+    const n = rates.length;
+    const avgRate = rates.reduce((s, v) => s + v, 0) / n;
+    const mx = Math.max(...rates), mn = Math.min(...rates);
+    const lowConfidence = n < 2 || mn <= 0 || (mx / mn) > 1.5;
+    rateInfo[acct] = { avgRate, lowConfidence };
+  }
+
+  // 2) Per-account weekly AMPS map for the trailing 9 completed weeks (Mon-start weeks,
+  // matching Snowflake's DATE_TRUNC('week', ...)). Missing weeks are 0-filled at lookup
+  // time below rather than skipped.
+  function mondayOf(d) {
+    const dt = new Date(d);
+    const day = dt.getUTCDay();
+    dt.setUTCDate(dt.getUTCDate() + (day === 0 ? -6 : 1 - day));
+    dt.setUTCHours(0, 0, 0, 0);
+    return dt;
+  }
+  const wkKey = d => d.toISOString().slice(0, 10);
+  const nowMonday = mondayOf(new Date());
+  const weekStarts = []; // most recent completed week first, 9 total
+  for (let k = 1; k <= 9; k++) weekStarts.push(new Date(nowMonday.getTime() - k * 7 * 86400000));
+  const validWeekKeys = new Set(weekStarts.map(wkKey));
+  const current4Keys = weekStarts.slice(0, 4).map(wkKey);
+  const prior4Keys = weekStarts.slice(4, 8).map(wkKey);
+
+  const weeklyByAccount = {}, weeklyRowCount = {};
+  for (const r of weekRows) {
+    const wk = parseDate(r.WK);
+    if (!validWeekKeys.has(wk)) continue;
+    const acct = r.ACCOUNT_ID;
+    (weeklyByAccount[acct] = weeklyByAccount[acct] || {})[wk] = +(r.AMPS || 0);
+    weeklyRowCount[acct] = (weeklyRowCount[acct] || 0) + 1;
+  }
+
+  // 3) Per-account 4-wk current/prior/target dollars. Accounts with fewer than 8 of the
+  // 9 trailing weekly rows (insufficient history) or no derivable rate contribute nothing
+  // to the customer-level sums below (target4 included, to keep pace_pct apples-to-apples
+  // with the numerator's scope) but still flip the customer's low-confidence flag.
+  function acctTrend(acct, capacityArr) {
+    const target4 = capacityArr > 0 ? capacityArr / 52 * 4 : 0;
+    const rInfo = rateInfo[acct];
+    const hasEnoughHistory = (weeklyRowCount[acct] || 0) >= 8;
+    if (!rInfo || !hasEnoughHistory) {
+      return { current4: null, prior4: null, target4, lowConfidence: rInfo ? rInfo.lowConfidence : true, insufficient: true };
+    }
+    const wk = weeklyByAccount[acct] || {};
+    const cur4Amps = current4Keys.reduce((s, k) => s + (wk[k] || 0), 0);
+    const pri4Amps = prior4Keys.reduce((s, k) => s + (wk[k] || 0), 0);
+    return { current4: cur4Amps * rInfo.avgRate, prior4: pri4Amps * rInfo.avgRate, target4, lowConfidence: rInfo.lowConfidence, insufficient: false };
+  }
+
+  // 4) Aggregate to customer level.
+  const byCustomer = {};
+  for (const r of capRows) {
+    const cid = r.CUSTOMER_ID;
+    const c = byCustomer[cid] || (byCustomer[cid] = {
+      name: r.CUSTOMER_NAME, vertical: r.VERTICAL || '', capacityArr: 0, burned: 0,
+      contractStart: '', contractEnd: '', current4: 0, prior4: 0, target4: 0, anyData: false, lowConfidence: false,
+    });
+    const capacityArr = +(r.CAPACITY_ARR || 0);
+    c.capacityArr += capacityArr;
+    c.burned += +(r.BURNED_THIS_YEAR || 0);
+    const cs = parseDate(r.CONSUMPTION_START_DT), ce = parseDate(r.CONSUMPTION_END_DT);
+    if (cs && (!c.contractStart || cs < c.contractStart)) c.contractStart = cs;
+    if (ce && (!c.contractEnd || ce > c.contractEnd)) c.contractEnd = ce;
+
+    const t = acctTrend(r.ACCOUNT_ID, capacityArr);
+    if (t.lowConfidence) c.lowConfidence = true;
+    if (!t.insufficient) {
+      c.current4 += t.current4; c.prior4 += t.prior4; c.target4 += t.target4;
+      c.anyData = true;
+    }
+  }
+
+  return Object.values(byCustomer).map(c => ({
+    name: c.name, vertical: c.vertical, capacityArr: c.capacityArr,
+    contractStart: c.contractStart, contractEnd: c.contractEnd, burned: c.burned,
+    pctBurned: c.capacityArr > 0 ? c.burned / c.capacityArr : null,
+    pacePct: (c.anyData && c.target4 > 0) ? c.current4 / c.target4 : null,
+    wowPct: (c.anyData && c.prior4 > 0) ? (c.current4 - c.prior4) / c.prior4 : null,
+    lowConfidence: c.lowConfidence,
+  }));
 }
 
 function tagHtml(type) {
@@ -805,6 +1009,93 @@ function buildHealthTable(rows){
   renderHealthTable(rows);
 }
 
+let consumptionData = [];
+let consumptionSortCol = 2, consumptionSortAsc = false; // default: ARR (Capacity) desc
+
+function pctBurnedClass(v) {
+  if (v == null) return '';
+  if (v > 1) return 'cov-bad';
+  if (v >= 0.7) return 'cov-warn';
+  return 'cov-good';
+}
+
+function wowClass(v) {
+  if (v == null) return 'var-flat';
+  if (v >= 0.05) return 'var-good';
+  if (v <= -0.05) return 'var-bad';
+  return 'var-flat';
+}
+
+function buildConsumptionCards(rows) {
+  const totalCapacity = rows.reduce((s, r) => s + r.capacityArr, 0);
+  const withPct = rows.filter(r => r.pctBurned != null);
+  const avgPct = withPct.length ? withPct.reduce((s, r) => s + r.pctBurned, 0) / withPct.length : null;
+  const overPace = rows.filter(r => r.pacePct != null && r.pacePct > 1.10).length;
+  document.getElementById('con-total').textContent = rows.length;
+  document.getElementById('con-capacity').textContent = K(totalCapacity);
+  document.getElementById('con-avgpct').textContent = avgPct != null ? PCT(avgPct) : '—';
+  document.getElementById('con-overpace').textContent = overPace;
+}
+
+function filterConsumptionTable() {
+  const q = document.getElementById('conSearch').value.toLowerCase();
+  const filtered = consumptionData.filter(r => !q || r.name.toLowerCase().includes(q));
+  renderConsumptionTable(filtered);
+}
+
+function sortConsumptionTable(col) {
+  if (consumptionSortCol === col) { consumptionSortAsc = !consumptionSortAsc; }
+  else { consumptionSortCol = col; consumptionSortAsc = (col === 0 || col === 1); }
+  filterConsumptionTable();
+}
+
+function renderConsumptionTable(rows) {
+  const getVal = (r, col) => [
+    r.name, r.vertical, r.capacityArr, r.contractStart, r.contractEnd, r.burned,
+    r.pctBurned == null ? -1 : r.pctBurned, r.pacePct == null ? -1 : r.pacePct, r.wowPct == null ? -999 : r.wowPct
+  ][col];
+  const sorted = [...rows].sort((a, b) => {
+    const av = getVal(a, consumptionSortCol), bv = getVal(b, consumptionSortCol);
+    if (typeof av === 'number') return consumptionSortAsc ? av - bv : bv - av;
+    return consumptionSortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+  });
+
+  const headers = ['Customer', 'Vertical', 'ARR (Capacity)', 'Contract Start', 'Contract End', 'Capacity Burned (YTD)', '% of Capacity Used', '4-Wk Pace vs Target', '4-Wk Trend (WoW)'];
+  let thead = '<thead><tr>';
+  headers.forEach((h, i) => {
+    const cls = consumptionSortCol === i ? (consumptionSortAsc ? 'sort-asc' : 'sort-desc') : '';
+    thead += `<th class="${cls}" onclick="sortConsumptionTable(${i})">${h}</th>`;
+  });
+  thead += '</tr></thead>';
+
+  let body = '<tbody>';
+  for (const r of sorted) {
+    const star = r.lowConfidence ? ` <span title="Derived usage-to-dollar rate is volatile for this account — treat as directional">*</span>` : '';
+    const wowLabel = r.wowPct == null ? '—' : (r.wowPct >= 0 ? '+' : '') + PCT(r.wowPct);
+    body += `<tr>
+      <td title="${r.name}">${r.name}</td>
+      <td class="td-left">${r.vertical || '<span style="color:#9ba3af">—</span>'}</td>
+      <td>${K(r.capacityArr)}</td>
+      <td>${fmtDateShort(r.contractStart)}</td>
+      <td>${fmtContractEnd(r.contractEnd)}</td>
+      <td>${K(r.burned)}</td>
+      <td class="${pctBurnedClass(r.pctBurned)}">${r.pctBurned != null ? PCT(r.pctBurned) : '—'}</td>
+      <td>${r.pacePct != null ? PCT(r.pacePct) : '—'}</td>
+      <td class="${wowClass(r.wowPct)}">${wowLabel}${star}</td>
+    </tr>`;
+  }
+  body += '</tbody>';
+
+  document.getElementById('consumptionTable').innerHTML = thead + body;
+  document.getElementById('con-count').textContent = `Showing ${rows.length} of ${consumptionData.length} customers`;
+}
+
+function buildConsumptionTable(rows) {
+  consumptionData = rows;
+  buildConsumptionCards(rows);
+  renderConsumptionTable(rows);
+}
+
 function showTab(name){
   document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -826,9 +1117,10 @@ async function loadAll() {
   try {
     msg.textContent = 'Connecting to Snowflake…';
     await waitForCowork();
-    msg.textContent = 'Fetching pipeline, closed deals, quotas, and customer health…';
-    const [pipeRows, closedRows, tgtRows, healthRows, rvpSelfRows] = await Promise.all([
-      execSQL(Q.pipeline), execSQL(Q.closedFYTD), execSQL(Q.salesTargets), execSQL(Q.customerHealth), execSQL(Q.rvpSelfOwnedDeals)
+    msg.textContent = 'Fetching pipeline, closed deals, quotas, customer health, and consumption…';
+    const [pipeRows, closedRows, tgtRows, healthRows, rvpSelfRows, conCapRows, conRateRows, conWeekRows] = await Promise.all([
+      execSQL(Q.pipeline), execSQL(Q.closedFYTD), execSQL(Q.salesTargets), execSQL(Q.customerHealth), execSQL(Q.rvpSelfOwnedDeals),
+      execSQL(Q.consumptionCapacity), execSQL(Q.consumptionRateInputs), execSQL(Q.consumptionWeeklyUsage)
     ]);
     msg.textContent = 'Building dashboard…';
     const deals = preProcessPipeline(pipeRows);
@@ -836,10 +1128,12 @@ async function loadAll() {
     const tgt = preProcessTargets(tgtRows);
     const health = preProcessCustomerHealth(healthRows);
     const rvpSelfDeals = preProcessRvpSelfDeals(rvpSelfRows);
+    const consumption = preProcessConsumption(conCapRows, conRateRows, conWeekRows);
 
     buildCards(deals, closed, tgt);
     buildRepTable(deals, closed, tgt, rvpSelfDeals);
     buildHealthTable(health);
+    buildConsumptionTable(consumption);
 
     document.getElementById('loadingOverlay').style.display = 'none';
   } catch (e) {

@@ -284,6 +284,92 @@ Q_CUSTOMER_HEALTH = """
     ORDER BY c.ARR DESC
 """
 
+# Consumption Health: current-contract-year capacity vs. burn per (customer, account), one
+# row per account — aggregated to the customer level in preprocess_consumption(). Contract
+# "years" aren't flagged in the data, so year_start/end_tenure derive the current 12-month
+# window from CONSUMPTION_MONTH_TENURE. Only customers with a currently-active DEAL_ID row
+# this month appear here, which naturally excludes subscription-only customers.
+Q_CONSUMPTION_CAPACITY = """
+    WITH sf_customers AS (
+      SELECT cam.CUSTOMER_ID, cam.CUSTOMER_NAME, cam.ACCOUNT_ID
+      FROM PROD.DEALSBASE.CUSTOMER_ACCOUNT_MAP cam
+      JOIN PROD.SALESFORCE.ACCOUNTS a ON cam.ACCOUNT_ID = a.ACCOUNT_ID
+      WHERE a.TYPE = 'Customer'
+      GROUP BY cam.CUSTOMER_ID, cam.CUSTOMER_NAME, cam.ACCOUNT_ID
+    ),
+    sf_vertical AS (
+      SELECT cam.CUSTOMER_ID, a.VERTICAL, COUNT(*) AS cnt
+      FROM PROD.DEALSBASE.CUSTOMER_ACCOUNT_MAP cam
+      JOIN PROD.SALESFORCE.ACCOUNTS a ON cam.ACCOUNT_ID = a.ACCOUNT_ID
+      WHERE a.VERTICAL IS NOT NULL AND a.VERTICAL != ''
+      GROUP BY cam.CUSTOMER_ID, a.VERTICAL
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY cam.CUSTOMER_ID ORDER BY cnt DESC) = 1
+    ),
+    current_deal AS (
+      SELECT ACCOUNT_ID, DEAL_ID, CONSUMPTION_MONTH_TENURE AS tenure_now, PRODUCT_C_ARR,
+             CONSUMPTION_START_DT, CONSUMPTION_END_DT
+      FROM PROD.DEALSBASE.CONSUMPTION_BUDGET
+      WHERE MONTH_BEGIN_DT = DATE_TRUNC('month', CURRENT_DATE())
+    ),
+    year_bounds AS (
+      SELECT *, FLOOR((tenure_now-1)/12)*12 + 1 AS year_start_tenure, FLOOR((tenure_now-1)/12)*12 + 12 AS year_end_tenure
+      FROM current_deal
+    ),
+    burn AS (
+      SELECT cb.ACCOUNT_ID, cb.DEAL_ID, SUM(cb.CONSUMPTION_AMOUNT) AS burned_this_year
+      FROM PROD.DEALSBASE.CONSUMPTION_BUDGET cb
+      JOIN year_bounds yb ON cb.ACCOUNT_ID = yb.ACCOUNT_ID AND cb.DEAL_ID = yb.DEAL_ID
+        AND cb.CONSUMPTION_MONTH_TENURE BETWEEN yb.year_start_tenure AND yb.year_end_tenure
+      GROUP BY cb.ACCOUNT_ID, cb.DEAL_ID
+    )
+    SELECT c.CUSTOMER_ID, c.CUSTOMER_NAME, c.ACCOUNT_ID,
+           COALESCE(v.VERTICAL,'') AS VERTICAL,
+           yb.PRODUCT_C_ARR AS CAPACITY_ARR,
+           yb.CONSUMPTION_START_DT, yb.CONSUMPTION_END_DT,
+           b.burned_this_year AS BURNED_THIS_YEAR
+    FROM sf_customers c
+    JOIN year_bounds yb ON c.ACCOUNT_ID = yb.ACCOUNT_ID
+    JOIN burn b ON yb.ACCOUNT_ID = b.ACCOUNT_ID AND yb.DEAL_ID = b.DEAL_ID
+    LEFT JOIN sf_vertical v ON c.CUSTOMER_ID = v.CUSTOMER_ID
+"""
+
+# Rate-input for the 4-Wk Pace/Trend derivation: dollarized monthly consumption vs. raw
+# AMPS usage for the trailing 3 complete months (excludes the current partial month).
+# Used to derive each account's own $/usage rate in preprocess_consumption().
+Q_CONSUMPTION_RATE_INPUTS = """
+    WITH cb AS (
+      SELECT ACCOUNT_ID, MONTH_BEGIN_DT, SUM(CONSUMPTION_AMOUNT) AS CONSUMPTION_AMOUNT
+      FROM PROD.DEALSBASE.CONSUMPTION_BUDGET
+      WHERE MONTH_BEGIN_DT >= DATEADD(month, -3, DATE_TRUNC('month', CURRENT_DATE()))
+        AND MONTH_BEGIN_DT < DATE_TRUNC('month', CURRENT_DATE())
+      GROUP BY ACCOUNT_ID, MONTH_BEGIN_DT
+    ),
+    amps AS (
+      SELECT SALESFORCE_ACCOUNT_ID AS ACCOUNT_ID, DATE_TRUNC('month', USAGE_DATE) AS MONTH_BEGIN_DT, SUM(AMPS_AMOUNT) AS AMPS_TOTAL
+      FROM PROD.FISHBOWL.AMPS
+      WHERE COALESCE(TENANT_IS_SANDBOX, FALSE) = FALSE
+        AND USAGE_DATE >= DATEADD(month, -3, DATE_TRUNC('month', CURRENT_DATE()))
+        AND USAGE_DATE < DATE_TRUNC('month', CURRENT_DATE())
+      GROUP BY 1, 2
+    )
+    SELECT cb.ACCOUNT_ID, cb.MONTH_BEGIN_DT, cb.CONSUMPTION_AMOUNT, amps.AMPS_TOTAL
+    FROM cb JOIN amps ON cb.ACCOUNT_ID = amps.ACCOUNT_ID AND cb.MONTH_BEGIN_DT = amps.MONTH_BEGIN_DT
+    WHERE amps.AMPS_TOTAL > 0
+"""
+
+# Weekly raw usage for the trailing 9 completed weeks (deliberately excludes the current,
+# still-in-progress week) — powers the 4-Wk Pace/Trend columns once converted to dollars
+# via the rate derived from Q_CONSUMPTION_RATE_INPUTS above.
+Q_CONSUMPTION_WEEKLY_USAGE = """
+    SELECT SALESFORCE_ACCOUNT_ID AS ACCOUNT_ID, DATE_TRUNC('week', USAGE_DATE) AS WK, SUM(AMPS_AMOUNT) AS AMPS
+    FROM PROD.FISHBOWL.AMPS
+    WHERE COALESCE(TENANT_IS_SANDBOX, FALSE) = FALSE
+      AND USAGE_DATE >= DATEADD(week, -9, DATE_TRUNC('week', CURRENT_DATE()))
+      AND USAGE_DATE < DATE_TRUNC('week', CURRENT_DATE())
+    GROUP BY 1, 2
+    ORDER BY 1, 2
+"""
+
 
 def q_closed_fytd():
     return f"""
@@ -416,6 +502,111 @@ def preprocess_customer_health(df):
             "e_score": num(r.get("E_SCORE")),
             "overall_score": num(r.get("OVERALL_SCORE")),
             "health_color": (r.get("HEALTH_COLOR") or "").lower(),
+        })
+    return rows
+
+
+def _monday_of(d):
+    return d - dt.timedelta(days=d.weekday())
+
+
+# Consumption Health: cap_df = one row per (customer, account) from Q_CONSUMPTION_CAPACITY;
+# rate_df = one row per (account, month) from Q_CONSUMPTION_RATE_INPUTS; week_df = one row
+# per (account, week) from Q_CONSUMPTION_WEEKLY_USAGE. Aggregates to customer level per the
+# spec: sum capacity/burn/current4/prior4/target4 dollars across a customer's accounts
+# FIRST, then compute pct/pace/wow ratios from the summed figures (never average ratios).
+def preprocess_consumption(cap_df, rate_df, week_df):
+    # 1) Per-account $/usage rate from trailing 3 complete months, + volatility flag.
+    rates_by_account = {}
+    for _, r in rate_df.iterrows():
+        amps = float(r.get("AMPS_TOTAL") or 0)
+        if not amps:
+            continue
+        acct = r.get("ACCOUNT_ID")
+        rates_by_account.setdefault(acct, []).append(float(r.get("CONSUMPTION_AMOUNT") or 0) / amps)
+
+    rate_info = {}
+    for acct, rates in rates_by_account.items():
+        n = len(rates)
+        avg_rate = sum(rates) / n
+        mx, mn = max(rates), min(rates)
+        low_confidence = n < 2 or mn <= 0 or (mx / mn) > 1.5
+        rate_info[acct] = {"avg_rate": avg_rate, "low_confidence": low_confidence}
+
+    # 2) Per-account weekly AMPS map for the trailing 9 completed weeks (Mon-start weeks,
+    # matching Snowflake's DATE_TRUNC('week', ...)). Missing weeks are 0-filled at lookup
+    # time below rather than skipped.
+    now_monday = _monday_of(TODAY)
+    week_starts = [now_monday - dt.timedelta(weeks=k) for k in range(1, 10)]  # most recent first
+    valid_week_keys = {d.isoformat() for d in week_starts}
+    current4_keys = [d.isoformat() for d in week_starts[0:4]]
+    prior4_keys = [d.isoformat() for d in week_starts[4:8]]
+
+    weekly_by_account, weekly_row_count = {}, {}
+    for _, r in week_df.iterrows():
+        wk = parse_date(r.get("WK"))
+        if wk not in valid_week_keys:
+            continue
+        acct = r.get("ACCOUNT_ID")
+        weekly_by_account.setdefault(acct, {})[wk] = float(r.get("AMPS") or 0)
+        weekly_row_count[acct] = weekly_row_count.get(acct, 0) + 1
+
+    # 3) Per-account 4-wk current/prior/target dollars. Accounts with fewer than 8 of the
+    # 9 trailing weekly rows (insufficient history) or no derivable rate contribute nothing
+    # to the customer-level sums below (target4 included, to keep pace_pct apples-to-apples
+    # with the numerator's scope) but still flip the customer's low-confidence flag.
+    def acct_trend(acct, capacity_arr):
+        target4 = capacity_arr / 52 * 4 if capacity_arr > 0 else 0
+        rinfo = rate_info.get(acct)
+        has_enough_history = weekly_row_count.get(acct, 0) >= 8
+        if not rinfo or not has_enough_history:
+            return {"current4": None, "prior4": None, "target4": target4,
+                     "low_confidence": rinfo["low_confidence"] if rinfo else True, "insufficient": True}
+        wk_map = weekly_by_account.get(acct, {})
+        cur4_amps = sum(wk_map.get(k, 0) for k in current4_keys)
+        pri4_amps = sum(wk_map.get(k, 0) for k in prior4_keys)
+        return {"current4": cur4_amps * rinfo["avg_rate"], "prior4": pri4_amps * rinfo["avg_rate"],
+                 "target4": target4, "low_confidence": rinfo["low_confidence"], "insufficient": False}
+
+    # 4) Aggregate to customer level.
+    by_customer = {}
+    for _, r in cap_df.iterrows():
+        cid = r.get("CUSTOMER_ID")
+        rec = by_customer.setdefault(cid, {
+            "name": r.get("CUSTOMER_NAME"), "vertical": r.get("VERTICAL") or "",
+            "capacity_arr": 0.0, "burned": 0.0, "contract_start": "", "contract_end": "",
+            "current4": 0.0, "prior4": 0.0, "target4": 0.0, "any_data": False, "low_confidence": False,
+        })
+        capacity_arr = float(r.get("CAPACITY_ARR") or 0)
+        rec["capacity_arr"] += capacity_arr
+        rec["burned"] += float(r.get("BURNED_THIS_YEAR") or 0)
+        cs = parse_date(r.get("CONSUMPTION_START_DT"))
+        ce = parse_date(r.get("CONSUMPTION_END_DT"))
+        if cs and (not rec["contract_start"] or cs < rec["contract_start"]):
+            rec["contract_start"] = cs
+        if ce and (not rec["contract_end"] or ce > rec["contract_end"]):
+            rec["contract_end"] = ce
+
+        t = acct_trend(r.get("ACCOUNT_ID"), capacity_arr)
+        if t["low_confidence"]:
+            rec["low_confidence"] = True
+        if not t["insufficient"]:
+            rec["current4"] += t["current4"]
+            rec["prior4"] += t["prior4"]
+            rec["target4"] += t["target4"]
+            rec["any_data"] = True
+
+    rows = []
+    for rec in by_customer.values():
+        pct_burned = rec["burned"] / rec["capacity_arr"] if rec["capacity_arr"] > 0 else None
+        pace_pct = rec["current4"] / rec["target4"] if (rec["any_data"] and rec["target4"] > 0) else None
+        wow_pct = ((rec["current4"] - rec["prior4"]) / rec["prior4"]
+                   if (rec["any_data"] and rec["prior4"] > 0) else None)
+        rows.append({
+            "name": rec["name"], "vertical": rec["vertical"], "capacity_arr": rec["capacity_arr"],
+            "contract_start": rec["contract_start"], "contract_end": rec["contract_end"], "burned": rec["burned"],
+            "pct_burned": pct_burned, "pace_pct": pace_pct, "wow_pct": wow_pct,
+            "low_confidence": rec["low_confidence"],
         })
     return rows
 
@@ -653,6 +844,78 @@ def build_health_table_html(rows):
     return f'<table class="custarr-table">{thead}{body}</table>'
 
 
+# ─── CONSUMPTION HEALTH: CARDS + TABLE ─────────────────────────────────────
+def build_consumption_cards(rows):
+    total_capacity = sum(r["capacity_arr"] for r in rows)
+    with_pct = [r for r in rows if r["pct_burned"] is not None]
+    avg_pct = sum(r["pct_burned"] for r in with_pct) / len(with_pct) if with_pct else None
+    over_pace = sum(1 for r in rows if r["pace_pct"] is not None and r["pace_pct"] > 1.10)
+    return {
+        "total": len(rows),
+        "capacity_label": K(total_capacity),
+        "avg_pct_label": PCT(avg_pct) if avg_pct is not None else "—",
+        "over_pace": over_pace,
+    }
+
+
+CONSUMPTION_HEADERS = ["Customer", "Vertical", "ARR (Capacity)", "Contract Start", "Contract End",
+                        "Capacity Burned (YTD)", "% of Capacity Used", "4-Wk Pace vs Target", "4-Wk Trend (WoW)"]
+
+CONSUMPTION_SORT_KEYS = {
+    "Customer": lambda r: (r["name"] or "").lower(),
+    "Vertical": lambda r: (r["vertical"] or "").lower(),
+    "ARR (Capacity)": lambda r: r["capacity_arr"],
+    "Contract Start": lambda r: r["contract_start"] or "",
+    "Contract End": lambda r: r["contract_end"] or "",
+    "Capacity Burned (YTD)": lambda r: r["burned"],
+    "% of Capacity Used": lambda r: r["pct_burned"] if r["pct_burned"] is not None else -1,
+    "4-Wk Pace vs Target": lambda r: r["pace_pct"] if r["pace_pct"] is not None else -1,
+    "4-Wk Trend (WoW)": lambda r: r["wow_pct"] if r["wow_pct"] is not None else -999,
+}
+
+
+def pct_burned_class(v):
+    if v is None:
+        return ""
+    if v > 1:
+        return "cov-bad"
+    if v >= 0.7:
+        return "cov-warn"
+    return "cov-good"
+
+
+def wow_class(v):
+    if v is None:
+        return "var-flat"
+    if v >= 0.05:
+        return "var-good"
+    if v <= -0.05:
+        return "var-bad"
+    return "var-flat"
+
+
+def build_consumption_table_html(rows):
+    thead = "<thead><tr>" + "".join(f"<th>{h}</th>" for h in CONSUMPTION_HEADERS) + "</tr></thead>"
+    body = "<tbody>"
+    for r in rows:
+        star = (' <span title="Derived usage-to-dollar rate is volatile for this account — treat as directional">*</span>'
+                if r["low_confidence"] else "")
+        wow_label = "—" if r["wow_pct"] is None else (("+" if r["wow_pct"] >= 0 else "") + PCT(r["wow_pct"]))
+        body += f"""<tr>
+      <td title="{esc(r['name'])}">{esc(r['name'])}</td>
+      <td class="td-left">{esc(r['vertical']) if r['vertical'] else '<span style="color:#9ba3af">—</span>'}</td>
+      <td>{K(r['capacity_arr'])}</td>
+      <td>{fmt_date_short(r['contract_start'])}</td>
+      <td>{fmt_contract_end(r['contract_end'])}</td>
+      <td>{K(r['burned'])}</td>
+      <td class="{pct_burned_class(r['pct_burned'])}">{PCT(r['pct_burned']) if r['pct_burned'] is not None else '—'}</td>
+      <td>{PCT(r['pace_pct']) if r['pace_pct'] is not None else '—'}</td>
+      <td class="{wow_class(r['wow_pct'])}">{wow_label}{star}</td>
+    </tr>"""
+    body += "</tbody>"
+    return f'<table class="custarr-table">{thead}{body}</table>'
+
+
 PAME_LEGEND_HTML = """
 <div class="table-card health-legend">
   <div class="hl-col">
@@ -799,6 +1062,9 @@ def main():
             tgt_df = run_query(q_sales_targets())
             health_df = run_query(Q_CUSTOMER_HEALTH)
             rvp_self_df = run_query(q_rvp_self_owned_deals())
+            con_cap_df = run_query(Q_CONSUMPTION_CAPACITY)
+            con_rate_df = run_query(Q_CONSUMPTION_RATE_INPUTS)
+            con_week_df = run_query(Q_CONSUMPTION_WEEKLY_USAGE)
     except Exception as e:
         st.error(f"Data load failed: {e}")
         st.stop()
@@ -808,9 +1074,10 @@ def main():
     tgt = preprocess_targets(tgt_df)
     health_rows = preprocess_customer_health(health_df)
     rvp_self_deals = preprocess_rvp_self_deals(rvp_self_df)
+    consumption_rows = preprocess_consumption(con_cap_df, con_rate_df, con_week_df)
     sales_summary_html, health_summary_html, summary_fetch_err = fetch_weekly_summaries()
 
-    tab_sales, tab_health = st.tabs(["Sales Performance", "Customer Health"])
+    tab_sales, tab_health, tab_consumption = st.tabs(["Sales Performance", "Customer Health", "Consumption Health"])
 
     with tab_sales:
         cards = build_cards(deals, closed, tgt)
@@ -902,6 +1169,49 @@ def main():
         )
         st.markdown(f'<div class="custarr-count">Showing {len(filtered)} of {len(health_rows)} customers</div>',
                     unsafe_allow_html=True)
+
+    with tab_consumption:
+        cc = build_consumption_cards(consumption_rows)
+        con_stat_defs = [
+            ("Consumption Customers", str(cc["total"]), "active capacity contract"),
+            ("Total Capacity ARR", cc["capacity_label"], "current contract year"),
+            ("Avg % of Capacity Used", cc["avg_pct_label"], "YTD burn ÷ capacity"),
+            ("Trending >110% Pace", str(cc["over_pace"]), "4-wk pace vs. target"),
+        ]
+        cols = st.columns(4)
+        for col, (label, value, sub) in zip(cols, con_stat_defs):
+            col.markdown(f"""<div class="custarr-stat">
+              <div class="cs-label">{label}</div>
+              <div class="cs-value">{value}</div>
+              <div class="cs-sub">{sub}</div>
+            </div>""", unsafe_allow_html=True)
+
+        st.markdown(
+            '<div class="section-title">Consumption health '
+            '<span class="hint">Capacity vs. burn from PROD.DEALSBASE.CONSUMPTION_BUDGET · 4-wk pace/trend derived '
+            'from PROD.FISHBOWL.AMPS usage at each account\'s own $/usage rate</span></div>',
+            unsafe_allow_html=True,
+        )
+
+        c1, c2, c3 = st.columns([3, 1, 1])
+        con_search = c1.text_input("Search", key="con_search", placeholder="Search customers…", label_visibility="collapsed")
+        con_sort_col = c2.selectbox("Sort by", CONSUMPTION_HEADERS, index=2, key="con_sort")
+        con_desc = c3.checkbox("Descending", value=True, key="con_desc")
+
+        con_filtered = [
+            r for r in consumption_rows
+            if not con_search or con_search.lower() in (r["name"] or "").lower()
+        ]
+        con_filtered.sort(key=CONSUMPTION_SORT_KEYS[con_sort_col], reverse=con_desc)
+
+        st.markdown(
+            f'<div class="table-card" style="max-height:640px; overflow-y:auto;">{build_consumption_table_html(con_filtered)}</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="custarr-count">Showing {len(con_filtered)} of {len(consumption_rows)} customers</div>',
+            unsafe_allow_html=True,
+        )
 
 
 if __name__ == "__main__":
