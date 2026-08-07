@@ -858,19 +858,19 @@ def build_consumption_cards(rows):
     }
 
 
-CONSUMPTION_HEADERS = ["Customer", "Vertical", "ARR (Capacity)", "Contract Start", "Contract End",
-                        "Capacity Burned (YTD)", "% of Capacity Used", "4-Wk Pace vs Target", "4-Wk Trend (WoW)"]
+CONSUMPTION_HEADERS = ["Customer", "Vertical", "ARR (Cap.)", "Contract Start", "Contract End",
+                        "Burned YTD", "% Used", "4-Wk Pace", "4-Wk Trend"]
 
 CONSUMPTION_SORT_KEYS = {
     "Customer": lambda r: (r["name"] or "").lower(),
     "Vertical": lambda r: (r["vertical"] or "").lower(),
-    "ARR (Capacity)": lambda r: r["capacity_arr"],
+    "ARR (Cap.)": lambda r: r["capacity_arr"],
     "Contract Start": lambda r: r["contract_start"] or "",
     "Contract End": lambda r: r["contract_end"] or "",
-    "Capacity Burned (YTD)": lambda r: r["burned"],
-    "% of Capacity Used": lambda r: r["pct_burned"] if r["pct_burned"] is not None else -1,
-    "4-Wk Pace vs Target": lambda r: r["pace_pct"] if r["pace_pct"] is not None else -1,
-    "4-Wk Trend (WoW)": lambda r: r["wow_pct"] if r["wow_pct"] is not None else -999,
+    "Burned YTD": lambda r: r["burned"],
+    "% Used": lambda r: r["pct_burned"] if r["pct_burned"] is not None else -1,
+    "4-Wk Pace": lambda r: r["pace_pct"] if r["pace_pct"] is not None else -1,
+    "4-Wk Trend": lambda r: r["wow_pct"] if r["wow_pct"] is not None else -999,
 }
 
 
@@ -895,7 +895,12 @@ def wow_class(v):
 
 
 def build_consumption_table_html(rows):
-    thead = "<thead><tr>" + "".join(f"<th>{h}</th>" for h in CONSUMPTION_HEADERS) + "</tr></thead>"
+    colgroup = """<colgroup>
+    <col style="width:17%"><col style="width:10%"><col style="width:9%">
+    <col style="width:10%"><col style="width:10%"><col style="width:9%">
+    <col style="width:9%"><col style="width:13%"><col style="width:13%">
+  </colgroup>"""
+    thead = colgroup + "<thead><tr>" + "".join(f"<th>{h}</th>" for h in CONSUMPTION_HEADERS) + "</tr></thead>"
     body = "<tbody>"
     for r in rows:
         star = (' <span title="Derived usage-to-dollar rate is volatile for this account — treat as directional">*</span>'
@@ -913,7 +918,7 @@ def build_consumption_table_html(rows):
       <td class="{wow_class(r['wow_pct'])}">{wow_label}{star}</td>
     </tr>"""
     body += "</tbody>"
-    return f'<table class="custarr-table">{thead}{body}</table>'
+    return f'<table class="custarr-table" id="consumptionTable">{thead}{body}</table>'
 
 
 PAME_LEGEND_HTML = """
@@ -1033,6 +1038,11 @@ tbody tr.total-row td { border-top:2px solid #0C0C0C; font-weight:700; }
 .custarr-table tbody tr.row-green td { background:#e7f5ea !important; }
 .custarr-table tbody tr:nth-child(even) td { background:#fcfcfc; }
 .custarr-count { font-size:11px; color:#9ba3af; margin-top:4px; }
+
+#consumptionTable { table-layout: fixed; }
+#consumptionTable th { white-space: normal; line-height: 1.25; padding: 6px 6px; font-size: 10px; }
+#consumptionTable td { padding: 5px 6px; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#consumptionTable td:first-child { max-width: none; }
 </style>
 """
 

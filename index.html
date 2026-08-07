@@ -128,6 +128,13 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
 #repTable thead tr.grp-hdr th.grp-1 { background: #eef2f7; color: #475569; }
 #repTable thead tr.grp-hdr th.grp-2 { background: #e7f5f7; color: #0e6a76; }
 #repTable thead tr.grp-hdr th.grp-3 { background: #fbfbe0; color: #7a6c00; }
+
+/* Consumption Health table: fixed layout + tightened columns so all 9 columns fit
+   without horizontal scroll (mirrors the #repTable treatment above). */
+#consumptionTable { table-layout: fixed; }
+#consumptionTable th { white-space: normal; line-height: 1.25; padding: 6px 6px; font-size: 10px; }
+#consumptionTable td { padding: 5px 6px; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#consumptionTable td:first-child { max-width: none; }
 </style>
 </head>
 <body>
@@ -1060,8 +1067,13 @@ function renderConsumptionTable(rows) {
     return consumptionSortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
   });
 
-  const headers = ['Customer', 'Vertical', 'ARR (Capacity)', 'Contract Start', 'Contract End', 'Capacity Burned (YTD)', '% of Capacity Used', '4-Wk Pace vs Target', '4-Wk Trend (WoW)'];
-  let thead = '<thead><tr>';
+  const headers = ['Customer', 'Vertical', 'ARR (Cap.)', 'Contract Start', 'Contract End', 'Burned YTD', '% Used', '4-Wk Pace', '4-Wk Trend'];
+  const colgroup = `<colgroup>
+    <col style="width:17%"><col style="width:10%"><col style="width:9%">
+    <col style="width:10%"><col style="width:10%"><col style="width:9%">
+    <col style="width:9%"><col style="width:13%"><col style="width:13%">
+  </colgroup>`;
+  let thead = colgroup + '<thead><tr>';
   headers.forEach((h, i) => {
     const cls = consumptionSortCol === i ? (consumptionSortAsc ? 'sort-asc' : 'sort-desc') : '';
     thead += `<th class="${cls}" onclick="sortConsumptionTable(${i})">${h}</th>`;
