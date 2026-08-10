@@ -153,6 +153,7 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
     <button class="tab-btn active" id="tabBtn-sales" onclick="showTab('sales')">Sales Performance</button>
     <button class="tab-btn" id="tabBtn-health" onclick="showTab('health')">Customer Health</button>
     <button class="tab-btn" id="tabBtn-consumption" onclick="showTab('consumption')">Consumption Health</button>
+    <button class="tab-btn" id="tabBtn-arr" onclick="showTab('arr')">YTD ARR Performance</button>
   </div>
   <div class="live-badge"><span class="live-dot"></span> Live · refreshes on load</div>
 </div>
@@ -289,6 +290,18 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
     <table class="custarr-table" id="consumptionTable"></table>
   </div>
   <div class="custarr-count" id="con-count"></div>
+</div>
+
+<div class="tab-pane" id="tab-arr">
+  <div id="arrCardsRow" class="cards-row"></div>
+
+  <div class="section-title">FY27 ARR performance by quarter <span class="hint">Actuals from PROD.DEALSBASE.CUSTOMER_MONTH · Plan from load.finance_sandbox.mrp_forecast (2026.3.6 – FY27 Final BoD Approved)</span></div>
+  <div class="table-card" style="overflow-x:auto"><table id="arrTable"></table></div>
+
+  <div class="section-title">New &amp; churned logos, FY27 YTD <span class="hint">Live from PROD.DEALSBASE.CUSTOMER_MONTH — updates automatically as deals close</span></div>
+  <div class="table-card" id="arrLogoCard" style="padding:16px 18px;">
+    <div id="arrLogoLists"></div>
+  </div>
 </div>
 
 </div>
@@ -556,6 +569,48 @@ const Q = {
       AND USAGE_DATE < DATE_TRUNC('week', CURRENT_DATE())
     GROUP BY 1, 2
     ORDER BY 1, 2`,
+
+  // YTD ARR Performance: monthly actuals from the authoritative ARR snapshot table.
+  // DATA_TYPE='Actuals' excludes the 'In Month' (partial current month) and
+  // 'Forecast' (future months) rows so nothing gets double-counted. New/churned
+  // logo counts derive from the IS_NEW_DEAL_DT/IS_CHURN_DT flags + CUSTOMER_CNT.
+  arrActuals: `
+    SELECT FISCAL_QTR, FISCAL_YR, FISCAL_PERIOD, MONTH_END_DT,
+      SUM(ARR) AS EOP_ARR,
+      SUM(NEW_ARR) AS NEW_ARR,
+      SUM(EXPANSION_ARR) AS EXPANSION_ARR,
+      SUM(CHURN_ARR) AS CHURN_ARR,
+      SUM(UP_FOR_RENEWAL_ARR) AS UP_FOR_RENEWAL_ARR,
+      SUM(RENEWED_ARR) AS RENEWED_ARR,
+      SUM(CASE WHEN IS_NEW_DEAL_DT THEN CUSTOMER_CNT ELSE 0 END) AS NEW_LOGOS,
+      SUM(CASE WHEN IS_CHURN_DT THEN CUSTOMER_CNT ELSE 0 END) AS CHURNED_LOGOS
+    FROM PROD.DEALSBASE.CUSTOMER_MONTH
+    WHERE DATA_TYPE = 'Actuals' AND FISCAL_YR = ${parseInt(CURRENT_FY_PREFIX)}
+    GROUP BY 1,2,3,4
+    ORDER BY MONTH_END_DT`,
+
+  // Plan/budget for the same metrics, from the BoD-approved FY27 annual budget.
+  // Each (ACCOUNT_NAME, month) pair can have more than one LEVEL_NAME row (e.g. a
+  // zero placeholder alongside the real figure) — SUM(VALUE) collapses these
+  // safely since the placeholder rows are always 0.
+  arrPlan: `
+    SELECT ACCOUNT_NAME, TIME_MONTH_END, SUM(VALUE) AS VALUE
+    FROM load.finance_sandbox.mrp_forecast
+    WHERE VERSION_NAME = '2026.3.6 - FY27 Final BoD Approved'
+      AND ACCOUNT_NAME IN ('New ARR','Expansion ARR','Downsell/Churn','Exiting ARR','New Logos','Churned Logos','Up For Renewal')
+    GROUP BY 1,2
+    ORDER BY TIME_MONTH_END`,
+
+  // Customer-level new-logo / churned-logo events for FY27 to date — powers the
+  // live "New & churned logos" lists (replaces what's a hand-maintained note in
+  // the FY27 scorecard spreadsheet).
+  arrLogoEvents: `
+    SELECT FISCAL_QTR, FISCAL_PERIOD, MONTH_END_DT, CUSTOMER_NAME,
+      IS_NEW_DEAL_DT, IS_CHURN_DT, NEW_ARR, CHURN_ARR
+    FROM PROD.DEALSBASE.CUSTOMER_MONTH
+    WHERE DATA_TYPE = 'Actuals' AND FISCAL_YR = ${parseInt(CURRENT_FY_PREFIX)}
+      AND (IS_NEW_DEAL_DT OR IS_CHURN_DT)
+    ORDER BY FISCAL_QTR, MONTH_END_DT`,
 };
 
 // ─── PRE-PROCESS ──────────────────────────────────────
@@ -743,6 +798,184 @@ function preProcessConsumption(capRows, rateRows, weekRows) {
     wowPct: (c.anyData && c.prior4 > 0) ? (c.current4 - c.prior4) / c.prior4 : null,
     lowConfidence: c.lowConfidence,
   }));
+}
+
+// ─── YTD ARR PERFORMANCE ──────────────────────────────
+// FY27 fiscal quarters (Amperity FY: Q1=Feb-Apr, Q2=May-Jul, Q3=Aug-Oct, Q4=Nov-Jan),
+// matching the FISCAL_QTR convention already used in PROD.DEALSBASE.CUSTOMER_MONTH.
+const ARR_FQ = [
+  { n: 1, label: 'Q1 FY27', months: 'Feb–Apr 2026' },
+  { n: 2, label: 'Q2 FY27', months: 'May–Jul 2026' },
+  { n: 3, label: 'Q3 FY27', months: 'Aug–Oct 2026' },
+  { n: 4, label: 'Q4 FY27', months: 'Nov 2026–Jan 2027' },
+];
+function monthToFQNum(dateStr) {
+  const m = new Date(dateStr + 'T00:00:00').getMonth(); // 0=Jan
+  if (m===1 || m===2 || m===3) return 1;
+  if (m===4 || m===5 || m===6) return 2;
+  if (m===7 || m===8 || m===9) return 3;
+  return 4; // Nov, Dec, Jan
+}
+// True-up / rounding correction rows can flip IS_NEW_DEAL_DT or IS_CHURN_DT with a
+// near-zero ARR value — filter these out of the name lists (the $ totals in the
+// quarterly table are unaffected; they sum every row regardless).
+const LOGO_NOISE_FLOOR = 500;
+
+function preProcessArrPerformance(actualRows, planRows, logoRows) {
+  const emptyQtr = () => ({ newArr:0, expArr:0, churnArr:0, upForRenewal:0, renewed:0, newLogos:0, churnedLogos:0, eopArr:null, hasActual:false });
+  const byQtr = { 1:emptyQtr(), 2:emptyQtr(), 3:emptyQtr(), 4:emptyQtr() };
+  let latestMonth = null, latestEop = null;
+  for (const r of actualRows) {
+    const q = byQtr[r.FISCAL_QTR];
+    if (!q) continue;
+    q.newArr += +(r.NEW_ARR||0);
+    q.expArr += +(r.EXPANSION_ARR||0);
+    q.churnArr += +(r.CHURN_ARR||0);
+    q.upForRenewal += +(r.UP_FOR_RENEWAL_ARR||0);
+    q.renewed += +(r.RENEWED_ARR||0);
+    q.newLogos += +(r.NEW_LOGOS||0);
+    q.churnedLogos += +(r.CHURNED_LOGOS||0);
+    q.eopArr = +(r.EOP_ARR||0); // rows arrive in MONTH_END_DT order, so the last write per quarter is that quarter's latest EOP
+    q.hasActual = true;
+    const m = r.MONTH_END_DT;
+    if (!latestMonth || m > latestMonth) { latestMonth = m; latestEop = +(r.EOP_ARR||0); }
+  }
+
+  const emptyPlanQtr = () => ({ newArr:0, expArr:0, churnArr:0, upForRenewal:0, newLogos:0, churnedLogos:0, eopArr:null });
+  const planByQtr = { 1:emptyPlanQtr(), 2:emptyPlanQtr(), 3:emptyPlanQtr(), 4:emptyPlanQtr() };
+  const PLAN_FIELD = { 'New ARR':'newArr', 'Expansion ARR':'expArr', 'Downsell/Churn':'churnArr', 'Up For Renewal':'upForRenewal', 'New Logos':'newLogos', 'Churned Logos':'churnedLogos' };
+  for (const r of planRows) {
+    const q = planByQtr[monthToFQNum(r.TIME_MONTH_END)];
+    if (!q) continue;
+    const field = PLAN_FIELD[r.ACCOUNT_NAME];
+    if (field) q[field] += +(r.VALUE||0);
+    if (r.ACCOUNT_NAME === 'Exiting ARR') q.eopArr = +(r.VALUE||0); // rows arrive in TIME_MONTH_END order
+  }
+
+  const emptyLogoBucket = () => ({ newLogos:[], churnedLogos:[] });
+  const logosByQtr = { 1:emptyLogoBucket(), 2:emptyLogoBucket(), 3:emptyLogoBucket(), 4:emptyLogoBucket() };
+  for (const r of logoRows) {
+    const bucket = logosByQtr[r.FISCAL_QTR];
+    if (!bucket) continue;
+    if (r.IS_NEW_DEAL_DT && Math.abs(+(r.NEW_ARR||0)) >= LOGO_NOISE_FLOOR) {
+      bucket.newLogos.push({ name: r.CUSTOMER_NAME, arr: +(r.NEW_ARR||0) });
+    }
+    if (r.IS_CHURN_DT && Math.abs(+(r.CHURN_ARR||0)) >= LOGO_NOISE_FLOOR) {
+      bucket.churnedLogos.push({ name: r.CUSTOMER_NAME, arr: +(r.CHURN_ARR||0) });
+    }
+  }
+
+  return { byQtr, planByQtr, logosByQtr, latestMonth, latestEop };
+}
+
+function buildArrCards(pp) {
+  const ytdActual = { newArr:0, expArr:0, churnArr:0 };
+  const ytdPlan = { newArr:0, expArr:0, churnArr:0 };
+  const fyPlan = { newArr:0, expArr:0, churnArr:0 };
+  for (const n of [1,2,3,4]) {
+    const p = pp.planByQtr[n];
+    fyPlan.newArr += p.newArr; fyPlan.expArr += p.expArr; fyPlan.churnArr += p.churnArr;
+    if (pp.byQtr[n].hasActual) {
+      const q = pp.byQtr[n];
+      ytdActual.newArr += q.newArr; ytdActual.expArr += q.expArr; ytdActual.churnArr += q.churnArr;
+      ytdPlan.newArr += p.newArr; ytdPlan.expArr += p.expArr; ytdPlan.churnArr += p.churnArr;
+    }
+  }
+  const netNewActual = ytdActual.newArr + ytdActual.expArr + ytdActual.churnArr;
+  const netNewPlanYtd = ytdPlan.newArr + ytdPlan.expArr + ytdPlan.churnArr;
+
+  function pace(actual, planYtd, higherIsBetter) {
+    if (!planYtd) return '';
+    const good = higherIsBetter ? actual >= planYtd : actual <= planYtd;
+    return good ? 'good' : 'warn';
+  }
+
+  const cards = [
+    { label:'Exiting ARR', value:K(pp.latestEop), sub: pp.latestMonth ? `as of ${fmtDateShort(pp.latestMonth)}` : '—' },
+    { label:'New ARR (FY27 YTD)', value:K(ytdActual.newArr), sub:`vs ${K(ytdPlan.newArr)} plan YTD · ${K(fyPlan.newArr)} FY27 plan`, cls:pace(ytdActual.newArr, ytdPlan.newArr, true) },
+    { label:'Expansion ARR (FY27 YTD)', value:K(ytdActual.expArr), sub:`vs ${K(ytdPlan.expArr)} plan YTD · ${K(fyPlan.expArr)} FY27 plan`, cls:pace(ytdActual.expArr, ytdPlan.expArr, true) },
+    { label:'Downsell/Churn ARR (FY27 YTD)', value:K(ytdActual.churnArr), sub:`vs ${K(ytdPlan.churnArr)} plan YTD · ${K(fyPlan.churnArr)} FY27 plan`, cls:pace(ytdActual.churnArr, ytdPlan.churnArr, false) },
+    { label:'Net New ARR (FY27 YTD)', value:K(netNewActual), sub:`vs ${K(netNewPlanYtd)} plan YTD`, cls:pace(netNewActual, netNewPlanYtd, true) },
+  ];
+  document.getElementById('arrCardsRow').innerHTML = cards.map(c=>`
+    <div class="stat-card ${c.cls||''}">
+      <div class="sc-label">${c.label}</div>
+      <div class="sc-value">${c.value}</div>
+      <div class="sc-sub">${c.sub}</div>
+    </div>`).join('');
+}
+
+function buildArrTable(pp) {
+  const rows = [
+    { label:'New ARR', key:'newArr', fmt:K, better:'high' },
+    { label:'Expansion ARR', key:'expArr', fmt:K, better:'high' },
+    { label:'New & Expansion ARR', derived:q=>q.newArr+q.expArr, fmt:K, better:'high' },
+    { label:'Downsell/Churn ARR', key:'churnArr', fmt:K, better:'low' },
+    { label:'Net New ARR', derived:q=>q.newArr+q.expArr+q.churnArr, fmt:K, better:'high' },
+    { label:'New logos (#)', key:'newLogos', fmt:N, better:'high' },
+    { label:'Churned logos (#)', key:'churnedLogos', fmt:N, better:'low' },
+    { label:'Up for renewal ARR', key:'upForRenewal', fmt:K, better:null },
+    { label:'Exiting ARR (EOP)', key:'eopArr', fmt:K, better:null, isEop:true },
+  ];
+
+  let h = `<thead><tr>
+    <th class="th-lbl">Metric</th>
+    ${ARR_FQ.map(fq=>`<th>${fq.label}<br><span class="hint" style="font-weight:400">${fq.months}</span></th>`).join('')}
+    <th>FY27 total<br><span class="hint" style="font-weight:400">Actual YTD vs. full-year plan</span></th>
+  </tr></thead><tbody>`;
+
+  for (const row of rows) {
+    h += `<tr><td class="lbl">${row.label}</td>`;
+    let totalActual = 0, anyActual = false;
+    for (const fq of ARR_FQ) {
+      const q = pp.byQtr[fq.n], p = pp.planByQtr[fq.n];
+      const actualVal = row.derived ? row.derived(q) : q[row.key];
+      const planVal = row.derived ? row.derived(p) : p[row.key];
+      const hasActual = row.isEop ? q.eopArr != null : q.hasActual;
+      if (hasActual) { anyActual = true; if (!row.isEop) totalActual += actualVal; }
+      const cls = (hasActual && row.better) ? (row.better==='high' ? (actualVal>=planVal?'var-good':'var-bad') : (actualVal<=planVal?'var-good':'var-bad')) : '';
+      h += `<td>
+        <div class="${cls}" style="font-weight:600">${hasActual ? row.fmt(actualVal) : '<span style="color:#9ba3af">—</span>'}</div>
+        <div class="hint" style="font-size:10.5px">Plan ${row.fmt(planVal)}</div>
+      </td>`;
+    }
+    const fyPlanTotal = row.isEop ? pp.planByQtr[4].eopArr
+      : ARR_FQ.reduce((s,fq)=>{ const p=pp.planByQtr[fq.n]; return s+(row.derived?row.derived(p):p[row.key]); }, 0);
+    const totalActualDisplay = row.isEop ? (pp.latestEop!=null ? row.fmt(pp.latestEop) : '—') : (anyActual ? row.fmt(totalActual) : '—');
+    const totalCmpActual = row.isEop ? pp.latestEop : totalActual;
+    const totalCls = (anyActual && row.better) ? (row.better==='high' ? (totalCmpActual>=fyPlanTotal?'var-good':'var-bad') : (totalCmpActual<=fyPlanTotal?'var-good':'var-bad')) : '';
+    h += `<td>
+      <div class="${totalCls}" style="font-weight:700">${totalActualDisplay}</div>
+      <div class="hint" style="font-size:10.5px">Plan ${row.fmt(fyPlanTotal)}</div>
+    </td></tr>`;
+  }
+  h += `</tbody>`;
+  document.getElementById('arrTable').innerHTML = h;
+}
+
+function buildArrLogoLists(pp) {
+  let h = '';
+  for (const fq of ARR_FQ) {
+    const b = pp.logosByQtr[fq.n];
+    if (!pp.byQtr[fq.n].hasActual) continue; // don't show quarters that haven't started yet
+    h += `<p class="lbl-sub" style="font-weight:700; margin-top:14px;">${fq.label} <span class="hint" style="font-weight:400">${fq.months}</span></p>`;
+    h += `<p style="margin:6px 0 2px; font-size:11px; color:#6b7280; font-weight:600;">New logos (${b.newLogos.length})</p>`;
+    h += b.newLogos.length
+      ? `<ul style="margin:2px 0 8px 20px;">${b.newLogos.map(l=>`<li>${l.name} — ${K(l.arr)}</li>`).join('')}</ul>`
+      : `<ul style="margin:2px 0 8px 20px;"><li>None yet this quarter</li></ul>`;
+    h += `<p style="margin:6px 0 2px; font-size:11px; color:#6b7280; font-weight:600;">Churned logos (${b.churnedLogos.length})</p>`;
+    h += b.churnedLogos.length
+      ? `<ul style="margin:2px 0 10px 20px;">${b.churnedLogos.map(l=>`<li>${l.name} — ${K(l.arr)}</li>`).join('')}</ul>`
+      : `<ul style="margin:2px 0 10px 20px;"><li>None yet this quarter</li></ul>`;
+  }
+  document.getElementById('arrLogoLists').innerHTML = h || '<p>No new or churned logos recorded yet in FY27.</p>';
+}
+
+function buildArrPerformance(actualRows, planRows, logoRows) {
+  const pp = preProcessArrPerformance(actualRows, planRows, logoRows);
+  buildArrCards(pp);
+  buildArrTable(pp);
+  buildArrLogoLists(pp);
 }
 
 function tagHtml(type) {
@@ -1130,9 +1363,10 @@ async function loadAll() {
     msg.textContent = 'Connecting to Snowflake…';
     await waitForCowork();
     msg.textContent = 'Fetching pipeline, closed deals, quotas, customer health, and consumption…';
-    const [pipeRows, closedRows, tgtRows, healthRows, rvpSelfRows, conCapRows, conRateRows, conWeekRows] = await Promise.all([
+    const [pipeRows, closedRows, tgtRows, healthRows, rvpSelfRows, conCapRows, conRateRows, conWeekRows, arrActualRows, arrPlanRows, arrLogoRows] = await Promise.all([
       execSQL(Q.pipeline), execSQL(Q.closedFYTD), execSQL(Q.salesTargets), execSQL(Q.customerHealth), execSQL(Q.rvpSelfOwnedDeals),
-      execSQL(Q.consumptionCapacity), execSQL(Q.consumptionRateInputs), execSQL(Q.consumptionWeeklyUsage)
+      execSQL(Q.consumptionCapacity), execSQL(Q.consumptionRateInputs), execSQL(Q.consumptionWeeklyUsage),
+      execSQL(Q.arrActuals), execSQL(Q.arrPlan), execSQL(Q.arrLogoEvents)
     ]);
     msg.textContent = 'Building dashboard…';
     const deals = preProcessPipeline(pipeRows);
@@ -1146,6 +1380,7 @@ async function loadAll() {
     buildRepTable(deals, closed, tgt, rvpSelfDeals);
     buildHealthTable(health);
     buildConsumptionTable(consumption);
+    buildArrPerformance(arrActualRows, arrPlanRows, arrLogoRows);
 
     document.getElementById('loadingOverlay').style.display = 'none';
   } catch (e) {
