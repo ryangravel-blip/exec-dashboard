@@ -593,11 +593,16 @@ const Q = {
   // Each (ACCOUNT_NAME, month) pair can have more than one LEVEL_NAME row (e.g. a
   // zero placeholder alongside the real figure) — SUM(VALUE) collapses these
   // safely since the placeholder rows are always 0.
+  // mrp_forecast carries many fiscal years of data (rows run out to 2029) and
+  // monthToFQNum() below only maps a date to a quarter NUMBER (1-4), not a
+  // specific year — so this date range is load-bearing: without it, every other
+  // year's Feb/May/Aug/Nov-start quarter gets folded into the same FY27 bucket.
   arrPlan: `
     SELECT ACCOUNT_NAME, TIME_MONTH_END, SUM(VALUE) AS VALUE
     FROM load.finance_sandbox.mrp_forecast
     WHERE VERSION_NAME = '2026.3.6 - FY27 Final BoD Approved'
       AND ACCOUNT_NAME IN ('New ARR','Expansion ARR','Downsell/Churn','Exiting ARR','New Logos','Churned Logos','Up For Renewal')
+      AND TIME_MONTH_END BETWEEN '2026-02-01' AND '2027-01-31'
     GROUP BY 1,2
     ORDER BY TIME_MONTH_END`,
 
