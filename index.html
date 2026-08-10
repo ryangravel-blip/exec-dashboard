@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <title>Amperity — Real-Time Dashboards</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <style>
 :root { color-scheme: light; }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -101,6 +102,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 .table-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; margin-bottom: 20px; }
 .chart-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 16px; margin-bottom: 20px; height: 260px; }
+
+/* YTD ARR Performance: grid of small Actual-vs-Plan bar charts + one EOP trend chart */
+.arr-charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.arr-charts-grid .chart-card { height: 280px; margin-bottom: 0; }
 
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 7px 10px; text-align: right; white-space: nowrap; font-size: 12.5px; }
@@ -296,7 +301,17 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
   <div id="arrCardsRow" class="cards-row"></div>
 
   <div class="section-title">FY27 ARR performance by quarter <span class="hint">Actuals from PROD.DEALSBASE.CUSTOMER_MONTH · Plan from load.finance_sandbox.mrp_forecast (2026.3.6 – FY27 Final BoD Approved)</span></div>
-  <div class="table-card" style="overflow-x:auto"><table id="arrTable"></table></div>
+  <div class="arr-charts-grid" id="arrChartsGrid">
+    <div class="chart-card"><canvas id="chart-newArr"></canvas></div>
+    <div class="chart-card"><canvas id="chart-expArr"></canvas></div>
+    <div class="chart-card"><canvas id="chart-newExpArr"></canvas></div>
+    <div class="chart-card"><canvas id="chart-churnArr"></canvas></div>
+    <div class="chart-card"><canvas id="chart-netNewArr"></canvas></div>
+    <div class="chart-card"><canvas id="chart-newLogos"></canvas></div>
+    <div class="chart-card"><canvas id="chart-churnedLogos"></canvas></div>
+    <div class="chart-card"><canvas id="chart-upForRenewal"></canvas></div>
+    <div class="chart-card"><canvas id="chart-eopArr"></canvas></div>
+  </div>
 
   <div class="section-title">New &amp; churned logos, FY27 YTD <span class="hint">Live from PROD.DEALSBASE.CUSTOMER_MONTH — updates automatically as deals close</span></div>
   <div class="table-card" id="arrLogoCard" style="padding:16px 18px;">
@@ -919,52 +934,93 @@ function buildArrCards(pp) {
     </div>`).join('');
 }
 
-function buildArrTable(pp) {
-  const rows = [
-    { label:'New ARR', key:'newArr', fmt:K, better:'high' },
-    { label:'Expansion ARR', key:'expArr', fmt:K, better:'high' },
-    { label:'New & Expansion ARR', derived:q=>q.newArr+q.expArr, fmt:K, better:'high' },
-    { label:'Downsell/Churn ARR', key:'churnArr', fmt:K, better:'low' },
-    { label:'Net New ARR', derived:q=>q.newArr+q.expArr+q.churnArr, fmt:K, better:'high' },
-    { label:'New logos (#)', key:'newLogos', fmt:N, better:'high' },
-    { label:'Churned logos (#)', key:'churnedLogos', fmt:N, better:'low' },
-    { label:'Up for renewal ARR', key:'upForRenewal', fmt:K, better:null },
-    { label:'Exiting ARR (EOP)', key:'eopArr', fmt:K, better:null, isEop:true },
-  ];
+// One Chart.js instance per canvas, keyed by canvas id — loadAll() only runs once per
+// page load (no periodic refresh), but keep a destroy-before-create guard anyway so a
+// future re-run of buildArrPerformance() (e.g. a manual re-fetch) doesn't leak/duplicate.
+const arrChartInstances = {};
+function destroyArrChart(canvasId) {
+  if (arrChartInstances[canvasId]) { arrChartInstances[canvasId].destroy(); delete arrChartInstances[canvasId]; }
+}
 
-  let h = `<thead><tr>
-    <th class="th-lbl">Metric</th>
-    ${ARR_FQ.map(fq=>`<th>${fq.label}<br><span class="hint" style="font-weight:400">${fq.months}</span></th>`).join('')}
-    <th>FY27 total<br><span class="hint" style="font-weight:400">Actual YTD vs. full-year plan</span></th>
-  </tr></thead><tbody>`;
+// Grouped Actual-vs-Plan bar chart for a single metric across the 4 FY27 quarters.
+// actualVals carries `null` for quarters that haven't happened yet, so Chart.js simply
+// omits that bar (matching the scorecard sheet's look — future quarters show Plan only).
+function makeArrBarChart(canvasId, title, actualVals, planVals, fmt) {
+  destroyArrChart(canvasId);
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  arrChartInstances[canvasId] = new Chart(el, {
+    type: 'bar',
+    data: {
+      labels: ARR_FQ.map(fq => fq.label),
+      datasets: [
+        { label: 'Actual', data: actualVals, backgroundColor: BRAND.teal, borderRadius: 3, maxBarThickness: 34 },
+        { label: 'Plan', data: planVals, backgroundColor: '#d1d5db', borderRadius: 3, maxBarThickness: 34 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        title: { display: true, text: title, align: 'start', color: '#0C0C0C', font: { size: 12, weight: '700' }, padding: { bottom: 10 } },
+        legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmt(c.raw)}` } },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, callback: v => fmt(v) } },
+      },
+    },
+  });
+}
 
-  for (const row of rows) {
-    h += `<tr><td class="lbl">${row.label}</td>`;
-    let totalActual = 0, anyActual = false;
-    for (const fq of ARR_FQ) {
-      const q = pp.byQtr[fq.n], p = pp.planByQtr[fq.n];
-      const actualVal = row.derived ? row.derived(q) : q[row.key];
-      const planVal = row.derived ? row.derived(p) : p[row.key];
-      const hasActual = row.isEop ? q.eopArr != null : q.hasActual;
-      if (hasActual) { anyActual = true; if (!row.isEop) totalActual += actualVal; }
-      const cls = (hasActual && row.better) ? (row.better==='high' ? (actualVal>=planVal?'var-good':'var-bad') : (actualVal<=planVal?'var-good':'var-bad')) : '';
-      h += `<td>
-        <div class="${cls}" style="font-weight:600">${hasActual ? row.fmt(actualVal) : '<span style="color:#9ba3af">—</span>'}</div>
-        <div class="hint" style="font-size:10.5px">Plan ${row.fmt(planVal)}</div>
-      </td>`;
-    }
-    const fyPlanTotal = row.isEop ? pp.planByQtr[4].eopArr
-      : ARR_FQ.reduce((s,fq)=>{ const p=pp.planByQtr[fq.n]; return s+(row.derived?row.derived(p):p[row.key]); }, 0);
-    const totalActualDisplay = row.isEop ? (pp.latestEop!=null ? row.fmt(pp.latestEop) : '—') : (anyActual ? row.fmt(totalActual) : '—');
-    const totalCmpActual = row.isEop ? pp.latestEop : totalActual;
-    const totalCls = (anyActual && row.better) ? (row.better==='high' ? (totalCmpActual>=fyPlanTotal?'var-good':'var-bad') : (totalCmpActual<=fyPlanTotal?'var-good':'var-bad')) : '';
-    h += `<td>
-      <div class="${totalCls}" style="font-weight:700">${totalActualDisplay}</div>
-      <div class="hint" style="font-size:10.5px">Plan ${row.fmt(fyPlanTotal)}</div>
-    </td></tr>`;
-  }
-  h += `</tbody>`;
-  document.getElementById('arrTable').innerHTML = h;
+// Exiting ARR (EOP): Plan drawn as a shaded area across all 4 quarters; Actual traced
+// as a solid line on top, stopping wherever actuals run out (null values beyond that —
+// spanGaps:false keeps the line from jumping ahead to future quarters).
+function makeArrEopChart(pp) {
+  const canvasId = 'chart-eopArr';
+  destroyArrChart(canvasId);
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  const planVals = [1,2,3,4].map(n => pp.planByQtr[n].eopArr);
+  const actualVals = [1,2,3,4].map(n => pp.byQtr[n].hasActual ? pp.byQtr[n].eopArr : null);
+  arrChartInstances[canvasId] = new Chart(el, {
+    type: 'line',
+    data: {
+      labels: ARR_FQ.map(fq => fq.label),
+      datasets: [
+        { label: 'Plan', data: planVals, borderColor: 'rgba(128,199,209,0.5)', backgroundColor: 'rgba(128,199,209,0.25)', fill: true, tension: 0.3, pointRadius: 3, borderWidth: 1 },
+        { label: 'Actual', data: actualVals, borderColor: '#0C0C0C', backgroundColor: '#0C0C0C', fill: false, tension: 0.3, pointRadius: 4, borderWidth: 2, spanGaps: false },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        title: { display: true, text: 'Exiting ARR (EOP)', align: 'start', color: '#0C0C0C', font: { size: 12, weight: '700' }, padding: { bottom: 10 } },
+        legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${K(c.raw)}` } },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, callback: v => K(v) } },
+      },
+    },
+  });
+}
+
+function buildArrCharts(pp) {
+  const qs = [1,2,3,4];
+  const actualOrNull = fn => qs.map(n => pp.byQtr[n].hasActual ? fn(pp.byQtr[n]) : null);
+  const planSeries = fn => qs.map(n => fn(pp.planByQtr[n]));
+
+  makeArrBarChart('chart-newArr', 'New ARR', actualOrNull(q=>q.newArr), planSeries(p=>p.newArr), K);
+  makeArrBarChart('chart-expArr', 'Expansion ARR', actualOrNull(q=>q.expArr), planSeries(p=>p.expArr), K);
+  makeArrBarChart('chart-newExpArr', 'New & Expansion ARR', actualOrNull(q=>q.newArr+q.expArr), planSeries(p=>p.newArr+p.expArr), K);
+  makeArrBarChart('chart-churnArr', 'Downsell/Churn ARR', actualOrNull(q=>q.churnArr), planSeries(p=>p.churnArr), K);
+  makeArrBarChart('chart-netNewArr', 'Net New ARR', actualOrNull(q=>q.newArr+q.expArr+q.churnArr), planSeries(p=>p.newArr+p.expArr+p.churnArr), K);
+  makeArrBarChart('chart-newLogos', 'New logos (#)', actualOrNull(q=>q.newLogos), planSeries(p=>p.newLogos), N);
+  makeArrBarChart('chart-churnedLogos', 'Churned logos (#)', actualOrNull(q=>q.churnedLogos), planSeries(p=>p.churnedLogos), N);
+  makeArrBarChart('chart-upForRenewal', 'Up for renewal ARR', actualOrNull(q=>q.upForRenewal), planSeries(p=>p.upForRenewal), K);
+  makeArrEopChart(pp);
 }
 
 function buildArrLogoLists(pp) {
@@ -988,7 +1044,7 @@ function buildArrLogoLists(pp) {
 function buildArrPerformance(actualRows, planRows, logoRows) {
   const pp = preProcessArrPerformance(actualRows, planRows, logoRows);
   buildArrCards(pp);
-  buildArrTable(pp);
+  buildArrCharts(pp);
   buildArrLogoLists(pp);
 }
 
