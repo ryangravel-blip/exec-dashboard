@@ -590,9 +590,12 @@ const Q = {
     ORDER BY MONTH_END_DT`,
 
   // Plan/budget for the same metrics, from the BoD-approved FY27 annual budget.
-  // Each (ACCOUNT_NAME, month) pair can have more than one LEVEL_NAME row (e.g. a
-  // zero placeholder alongside the real figure) — SUM(VALUE) collapses these
-  // safely since the placeholder rows are always 0.
+  // Each (ACCOUNT_NAME, month) pair can carry more than one LEVEL_NAME row. For
+  // every metric except 'New Logos' the only non-zero row is 'Top Level (Rollup)'
+  // (Sales-AE is a zero placeholder there); 'New Logos' is the one exception —
+  // it carries the SAME non-zero value on both 'Sales-AE' and 'Top Level (Rollup)',
+  // so a blind SUM(VALUE) double-counts it. Filtering to LEVEL_NAME = 'Top Level
+  // (Rollup)' gives the correct figure for every metric in one pass.
   // mrp_forecast carries many fiscal years of data (rows run out to 2029) and
   // monthToFQNum() below only maps a date to a quarter NUMBER (1-4), not a
   // specific year — so this date range is load-bearing: without it, every other
@@ -603,6 +606,7 @@ const Q = {
     WHERE VERSION_NAME = '2026.3.6 - FY27 Final BoD Approved'
       AND ACCOUNT_NAME IN ('New ARR','Expansion ARR','Downsell/Churn','Exiting ARR','New Logos','Churned Logos','Up For Renewal')
       AND TIME_MONTH_END BETWEEN '2026-02-01' AND '2027-01-31'
+      AND LEVEL_NAME = 'Top Level (Rollup)'
     GROUP BY 1,2
     ORDER BY TIME_MONTH_END`,
 
