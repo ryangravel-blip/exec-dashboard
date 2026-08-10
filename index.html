@@ -1416,6 +1416,12 @@ function showTab(name){
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   document.getElementById('tabBtn-'+name).classList.add('active');
+  // Chart.js charts built while their tab-pane was display:none (i.e. every tab except
+  // the default one, at page-load time) size themselves against a 0×0 container and
+  // render blank. Force a resize/redraw the moment the ARR tab actually becomes visible.
+  if (name === 'arr') {
+    Object.values(arrChartInstances).forEach(ch => { ch.resize(); ch.update(); });
+  }
 }
 
 // ─── MAIN ─────────────────────────────────────────────
