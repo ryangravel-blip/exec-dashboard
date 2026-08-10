@@ -810,7 +810,12 @@ const ARR_FQ = [
   { n: 4, label: 'Q4 FY27', months: 'Nov 2026–Jan 2027' },
 ];
 function monthToFQNum(dateStr) {
-  const m = new Date(dateStr + 'T00:00:00').getMonth(); // 0=Jan
+  // mrp_forecast's TIME_MONTH_END can arrive as an epoch-day integer rather than
+  // an ISO string (same quirk parseDate() already handles elsewhere in this file)
+  // — normalize through parseDate() first or every date silently falls through
+  // to Q4 (NaN month comparisons are always false).
+  const s = parseDate(dateStr);
+  const m = parseInt(s.slice(5,7), 10) - 1; // 0=Jan
   if (m===1 || m===2 || m===3) return 1;
   if (m===4 || m===5 || m===6) return 2;
   if (m===7 || m===8 || m===9) return 3;
@@ -837,7 +842,7 @@ function preProcessArrPerformance(actualRows, planRows, logoRows) {
     q.churnedLogos += +(r.CHURNED_LOGOS||0);
     q.eopArr = +(r.EOP_ARR||0); // rows arrive in MONTH_END_DT order, so the last write per quarter is that quarter's latest EOP
     q.hasActual = true;
-    const m = r.MONTH_END_DT;
+    const m = parseDate(r.MONTH_END_DT);
     if (!latestMonth || m > latestMonth) { latestMonth = m; latestEop = +(r.EOP_ARR||0); }
   }
 
