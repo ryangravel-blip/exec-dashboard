@@ -591,7 +591,15 @@ const Q = {
     SELECT c.CUSTOMER_ID, c.CUSTOMER_NAME, c.ACCOUNT_ID,
            COALESCE(v.VERTICAL,'') AS VERTICAL,
            yb.PRODUCT_C_ARR AS CAPACITY_ARR,
-           yb.CONSUMPTION_START_DT, yb.CONSUMPTION_END_DT,
+           yb.CONSUMPTION_START_DT,
+           -- Contract End: sourced from PROD.FISHBOWL.ACCOUNTS.CONTRACT_END_DATE (same field
+           -- backing the SV_COMBINED_ACCOUNTS semantic view), not CONSUMPTION_BUDGET's
+           -- CONSUMPTION_END_DT — validated against all 59 consumption accounts, only
+           -- Worldwide Golf Shops differed (1/30/2027 vs. 12/30/2027) because their recurring
+           -- capacity line ends before a one-time services line item on the same deal; the
+           -- semantic view/true contract term reflects the full deal, so that's the source of
+           -- truth here. Falls back to CONSUMPTION_END_DT if the account has no SF contract row.
+           COALESCE(fb.CONTRACT_END_DATE, yb.CONSUMPTION_END_DT) AS CONTRACT_END_DATE,
            byr.burned_this_year AS BURNED_THIS_YEAR,
            bl.burned_life_to_date AS BURNED_LIFE_TO_DATE,
            COALESCE(t.TCV_RECURRING, 0) AS TCV_RECURRING
@@ -600,7 +608,8 @@ const Q = {
     JOIN burn_year byr ON yb.ACCOUNT_ID = byr.ACCOUNT_ID AND yb.DEAL_ID = byr.DEAL_ID
     JOIN burn_life bl ON yb.ACCOUNT_ID = bl.ACCOUNT_ID AND yb.DEAL_ID = bl.DEAL_ID
     LEFT JOIN tcv_recurring t ON yb.DEAL_ID = t.DEAL_ID
-    LEFT JOIN sf_vertical v ON c.CUSTOMER_ID = v.CUSTOMER_ID`,
+    LEFT JOIN sf_vertical v ON c.CUSTOMER_ID = v.CUSTOMER_ID
+    LEFT JOIN PROD.FISHBOWL.ACCOUNTS fb ON c.ACCOUNT_ID = fb.SALESFORCE_ACCOUNT_ID`,
 
   // Rate-input for the 4-Wk Pace/Trend derivation: dollarized monthly consumption vs.
   // raw AMPS usage for the trailing 3 complete months (excludes the current partial
@@ -859,7 +868,7 @@ function preProcessConsumption(capRows, rateRows, weekRows) {
     c.burned += +(r.BURNED_THIS_YEAR || 0);
     c.burnedLifeToDate += +(r.BURNED_LIFE_TO_DATE || 0);
     c.tcvRecurring += +(r.TCV_RECURRING || 0);
-    const cs = parseDate(r.CONSUMPTION_START_DT), ce = parseDate(r.CONSUMPTION_END_DT);
+    const cs = parseDate(r.CONSUMPTION_START_DT), ce = parseDate(r.CONTRACT_END_DATE);
     if (cs && (!c.contractStart || cs < c.contractStart)) c.contractStart = cs;
     if (ce && (!c.contractEnd || ce > c.contractEnd)) c.contractEnd = ce;
 
