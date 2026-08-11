@@ -314,6 +314,13 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
   <div class="section-title">Consumption health <span class="hint">Capacity/TCV vs. burn from PROD.DEALSBASE.CONSUMPTION_BUDGET &amp; CONS_DEAL_PRODUCTS · % consumed and time elapsed drive the pacing multiple · 4-wk pace/trend derived from PROD.FISHBOWL.AMPS usage at each account's own $/usage rate</span></div>
   <div class="custarr-controls">
     <input type="text" id="conSearch" placeholder="Search customers…" oninput="filterConsumptionTable()">
+    <label>Health: <select id="conHealthFilter" onchange="filterConsumptionTable()">
+      <option value="">All</option>
+      <option value="over">Overpacing</option>
+      <option value="ontrack">On track</option>
+      <option value="under">Underpacing</option>
+      <option value="sigunder">Significantly underpacing</option>
+    </select></label>
   </div>
   <div class="table-card" style="overflow-x:auto; max-height:640px; overflow-y:auto;">
     <table class="custarr-table" id="consumptionTable"></table>
@@ -1562,7 +1569,12 @@ function buildConsumptionCards(rows) {
 
 function filterConsumptionTable() {
   const q = document.getElementById('conSearch').value.toLowerCase();
-  const filtered = consumptionData.filter(r => !q || r.name.toLowerCase().includes(q));
+  const healthFilter = document.getElementById('conHealthFilter').value;
+  const healthOf = r => consumptionMetricMode === 'tcv' ? r.tcvHealth : r.arrHealth;
+  const filtered = consumptionData.filter(r =>
+    (!q || r.name.toLowerCase().includes(q)) &&
+    (!healthFilter || healthOf(r) === healthFilter)
+  );
   renderConsumptionTable(filtered);
 }
 
