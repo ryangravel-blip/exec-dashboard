@@ -103,6 +103,29 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .table-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; margin-bottom: 20px; }
 .chart-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 16px; margin-bottom: 20px; height: 260px; }
 
+/* Consumption Health: ARR/TCV toggle + per-health-category pacing cards */
+.metric-toggle { display: inline-flex; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; margin-bottom: 16px; }
+.metric-toggle-btn { background: #fff; border: none; padding: 7px 16px; font-size: 12px; font-weight: 600; color: #6b7280; cursor: pointer; }
+.metric-toggle-btn.active { background: #0C0C0C; color: #fff; }
+.metric-toggle-btn:not(.active):hover { background: #f1f5f9; }
+
+.pace-cards-row { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+.pace-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 14px 18px; flex: 1; min-width: 220px; border-top: 3px solid #d1d5db; }
+.pace-card-title { font-size: 12.5px; font-weight: 700; color: #0C0C0C; margin-bottom: 6px; }
+.pace-card-count { font-size: 10.5px; color: #9ba3af; margin-bottom: 10px; }
+.pace-card-row { display: flex; justify-content: space-between; font-size: 11.5px; color: #6b7280; margin-bottom: 4px; }
+.pace-card-row b { color: #1a1a2e; }
+.pace-card-multiple { font-size: 20px; font-weight: 700; margin-top: 8px; color: #0C0C0C; }
+.pace-card.pace-cat-over { border-top-color: #80C7D1; }
+.pace-card.pace-cat-ontrack { border-top-color: #15803d; }
+.pace-card.pace-cat-under { border-top-color: #d97706; }
+.pace-card.pace-cat-sigunder { border-top-color: #dc2626; }
+.pace-badge { display: inline-block; font-size: 10.5px; font-weight: 700; border-radius: 4px; padding: 2px 8px; white-space: nowrap; }
+.pace-badge.pace-cat-over { background: #e0f5f7; color: #0e6a76; }
+.pace-badge.pace-cat-ontrack { background: #e7f5ea; color: #15803d; }
+.pace-badge.pace-cat-under { background: #fdf3d9; color: #92400e; }
+.pace-badge.pace-cat-sigunder { background: #fbe9e9; color: #b91c1c; }
+
 /* YTD ARR Performance: grid of small Actual-vs-Plan bar charts + one EOP trend chart */
 .arr-charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 20px; }
 .arr-charts-grid .chart-card { height: 280px; margin-bottom: 0; }
@@ -281,14 +304,14 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
 </div>
 
 <div class="tab-pane" id="tab-consumption">
-  <div class="custarr-summary">
-    <div class="custarr-stat"><div class="cs-label">Consumption Customers</div><div class="cs-value" id="con-total">—</div><div class="cs-sub">active capacity contract</div></div>
-    <div class="custarr-stat"><div class="cs-label">Total Capacity ARR</div><div class="cs-value" id="con-capacity">—</div><div class="cs-sub">current contract year</div></div>
-    <div class="custarr-stat"><div class="cs-label">Avg % of Capacity Used</div><div class="cs-value" id="con-avgpct">—</div><div class="cs-sub">YTD burn ÷ capacity</div></div>
-    <div class="custarr-stat"><div class="cs-label">Trending &gt;110% Pace</div><div class="cs-value" id="con-overpace">—</div><div class="cs-sub">4-wk pace vs. target</div></div>
+  <div class="metric-toggle" id="consumptionMetricToggle">
+    <button class="metric-toggle-btn active" data-mode="arr" onclick="setConsumptionMetric('arr')">ARR</button>
+    <button class="metric-toggle-btn" data-mode="tcv" onclick="setConsumptionMetric('tcv')">TCV (excl. one-time)</button>
   </div>
 
-  <div class="section-title">Consumption health <span class="hint">Capacity vs. burn from PROD.DEALSBASE.CONSUMPTION_BUDGET · 4-wk pace/trend derived from PROD.FISHBOWL.AMPS usage at each account's own $/usage rate</span></div>
+  <div class="pace-cards-row" id="consumptionCardsRow"></div>
+
+  <div class="section-title">Consumption health <span class="hint">Capacity/TCV vs. burn from PROD.DEALSBASE.CONSUMPTION_BUDGET &amp; CONS_DEAL_PRODUCTS · % consumed and time elapsed drive the pacing multiple · 4-wk pace/trend derived from PROD.FISHBOWL.AMPS usage at each account's own $/usage rate</span></div>
   <div class="custarr-controls">
     <input type="text" id="conSearch" placeholder="Search customers…" oninput="filterConsumptionTable()">
   </div>
@@ -508,6 +531,11 @@ const Q = {
   // current 12-month window from CONSUMPTION_MONTH_TENURE. Only customers with a
   // currently-active DEAL_ID row this month appear here, which naturally excludes
   // subscription-only customers.
+  // Also pulls what's needed for the ARR/TCV pacing toggle: BURNED_LIFE_TO_DATE (all-time
+  // consumption since contract inception, not just this contract year) and TCV_RECURRING
+  // (deal's total contract value excluding one-time services, from CONS_DEAL_PRODUCTS'
+  // IS_RECURRING_REVENUE flag — confirmed against a 5-year deal where TCV_RECURRING /
+  // PRODUCT_C_ARR = 5.0 exactly, i.e. TCV_RECURRING = ARR × contract-length-in-years).
   consumptionCapacity: `
     WITH sf_customers AS (
       SELECT cam.CUSTOMER_ID, cam.CUSTOMER_NAME, cam.ACCOUNT_ID
@@ -534,21 +562,37 @@ const Q = {
       SELECT *, FLOOR((tenure_now-1)/12)*12 + 1 AS year_start_tenure, FLOOR((tenure_now-1)/12)*12 + 12 AS year_end_tenure
       FROM current_deal
     ),
-    burn AS (
+    burn_year AS (
       SELECT cb.ACCOUNT_ID, cb.DEAL_ID, SUM(cb.CONSUMPTION_AMOUNT) AS burned_this_year
       FROM PROD.DEALSBASE.CONSUMPTION_BUDGET cb
       JOIN year_bounds yb ON cb.ACCOUNT_ID = yb.ACCOUNT_ID AND cb.DEAL_ID = yb.DEAL_ID
         AND cb.CONSUMPTION_MONTH_TENURE BETWEEN yb.year_start_tenure AND yb.year_end_tenure
       GROUP BY cb.ACCOUNT_ID, cb.DEAL_ID
+    ),
+    burn_life AS (
+      SELECT cb.ACCOUNT_ID, cb.DEAL_ID, SUM(cb.CONSUMPTION_AMOUNT) AS burned_life_to_date
+      FROM PROD.DEALSBASE.CONSUMPTION_BUDGET cb
+      JOIN year_bounds yb ON cb.ACCOUNT_ID = yb.ACCOUNT_ID AND cb.DEAL_ID = yb.DEAL_ID
+      GROUP BY cb.ACCOUNT_ID, cb.DEAL_ID
+    ),
+    tcv_recurring AS (
+      SELECT DEAL_ID, SUM(TCV) AS TCV_RECURRING
+      FROM PROD.DEALSBASE.CONS_DEAL_PRODUCTS
+      WHERE IS_RECURRING_REVENUE = TRUE
+      GROUP BY DEAL_ID
     )
     SELECT c.CUSTOMER_ID, c.CUSTOMER_NAME, c.ACCOUNT_ID,
            COALESCE(v.VERTICAL,'') AS VERTICAL,
            yb.PRODUCT_C_ARR AS CAPACITY_ARR,
            yb.CONSUMPTION_START_DT, yb.CONSUMPTION_END_DT,
-           b.burned_this_year AS BURNED_THIS_YEAR
+           byr.burned_this_year AS BURNED_THIS_YEAR,
+           bl.burned_life_to_date AS BURNED_LIFE_TO_DATE,
+           COALESCE(t.TCV_RECURRING, 0) AS TCV_RECURRING
     FROM sf_customers c
     JOIN year_bounds yb ON c.ACCOUNT_ID = yb.ACCOUNT_ID
-    JOIN burn b ON yb.ACCOUNT_ID = b.ACCOUNT_ID AND yb.DEAL_ID = b.DEAL_ID
+    JOIN burn_year byr ON yb.ACCOUNT_ID = byr.ACCOUNT_ID AND yb.DEAL_ID = byr.DEAL_ID
+    JOIN burn_life bl ON yb.ACCOUNT_ID = bl.ACCOUNT_ID AND yb.DEAL_ID = bl.DEAL_ID
+    LEFT JOIN tcv_recurring t ON yb.DEAL_ID = t.DEAL_ID
     LEFT JOIN sf_vertical v ON c.CUSTOMER_ID = v.CUSTOMER_ID`,
 
   // Rate-input for the 4-Wk Pace/Trend derivation: dollarized monthly consumption vs.
@@ -800,11 +844,14 @@ function preProcessConsumption(capRows, rateRows, weekRows) {
     const cid = r.CUSTOMER_ID;
     const c = byCustomer[cid] || (byCustomer[cid] = {
       name: r.CUSTOMER_NAME, vertical: r.VERTICAL || '', capacityArr: 0, burned: 0,
+      burnedLifeToDate: 0, tcvRecurring: 0,
       contractStart: '', contractEnd: '', current4: 0, prior4: 0, target4: 0, anyData: false, lowConfidence: false,
     });
     const capacityArr = +(r.CAPACITY_ARR || 0);
     c.capacityArr += capacityArr;
     c.burned += +(r.BURNED_THIS_YEAR || 0);
+    c.burnedLifeToDate += +(r.BURNED_LIFE_TO_DATE || 0);
+    c.tcvRecurring += +(r.TCV_RECURRING || 0);
     const cs = parseDate(r.CONSUMPTION_START_DT), ce = parseDate(r.CONSUMPTION_END_DT);
     if (cs && (!c.contractStart || cs < c.contractStart)) c.contractStart = cs;
     if (ce && (!c.contractEnd || ce > c.contractEnd)) c.contractEnd = ce;
@@ -817,15 +864,75 @@ function preProcessConsumption(capRows, rateRows, weekRows) {
     }
   }
 
-  return Object.values(byCustomer).map(c => ({
-    name: c.name, vertical: c.vertical, capacityArr: c.capacityArr,
-    contractStart: c.contractStart, contractEnd: c.contractEnd, burned: c.burned,
-    pctBurned: c.capacityArr > 0 ? c.burned / c.capacityArr : null,
-    pacePct: (c.anyData && c.target4 > 0) ? c.current4 / c.target4 : null,
-    wowPct: (c.anyData && c.prior4 > 0) ? (c.current4 - c.prior4) / c.prior4 : null,
-    lowConfidence: c.lowConfidence,
-  }));
+  return Object.values(byCustomer).map(c => {
+    const p = computePacing(c.contractStart, c.contractEnd, c.burned, c.capacityArr, c.burnedLifeToDate, c.tcvRecurring);
+    return {
+      name: c.name, vertical: c.vertical, capacityArr: c.capacityArr, tcvRecurring: c.tcvRecurring,
+      contractStart: c.contractStart, contractEnd: c.contractEnd,
+      burned: c.burned, burnedLifeToDate: c.burnedLifeToDate,
+      pacePct: (c.anyData && c.target4 > 0) ? c.current4 / c.target4 : null,
+      wowPct: (c.anyData && c.prior4 > 0) ? (c.current4 - c.prior4) / c.prior4 : null,
+      lowConfidence: c.lowConfidence,
+      arrConsumedPct: p.arrConsumedPct, arrElapsedPct: p.arrElapsedPct, arrMultiple: p.arrMultiple,
+      tcvConsumedPct: p.tcvConsumedPct, tcvElapsedPct: p.tcvElapsedPct, tcvMultiple: p.tcvMultiple,
+      arrHealth: pacingHealthCategory(p.arrMultiple), tcvHealth: pacingHealthCategory(p.tcvMultiple),
+    };
+  });
 }
+
+// ARR basis: % consumed = this-contract-year burn ÷ capacity ARR; % time elapsed = how far
+// through the CURRENT anniversary year (contractStart + N whole years) today is.
+// TCV basis: % consumed = all-time burn since contract inception ÷ TCV (excl. one-time
+// services); % time elapsed = how far through the FULL contract term today is. Both bases
+// produce a "multiple" (consumed% ÷ elapsed%) — 1.0 means consumption is exactly on pace
+// with time elapsed; >1.0 means running ahead, <1.0 means running behind.
+function elapsedFraction(start, end, today) {
+  const total = end - start;
+  if (!(total > 0)) return null;
+  return Math.max(0, Math.min(1, (today - start) / total));
+}
+
+function computePacing(contractStartStr, contractEndStr, burnedThisYear, capacityArr, burnedLifeToDate, tcvRecurring) {
+  const out = { arrConsumedPct: null, arrElapsedPct: null, arrMultiple: null, tcvConsumedPct: null, tcvElapsedPct: null, tcvMultiple: null };
+  if (!contractStartStr) return out;
+  const today = new Date();
+  const start = new Date(contractStartStr + 'T00:00:00Z');
+  const end = contractEndStr ? new Date(contractEndStr + 'T00:00:00Z') : null;
+
+  // Current contract-year window: walk anniversary-to-anniversary from contractStart
+  // until we find the year that contains today (handles multi-year contracts where the
+  // "current year" isn't simply year 1).
+  let yearStart = new Date(start);
+  while (true) {
+    const next = new Date(yearStart);
+    next.setUTCFullYear(next.getUTCFullYear() + 1);
+    if (next > today) break;
+    yearStart = next;
+  }
+  let yearEnd = new Date(yearStart);
+  yearEnd.setUTCFullYear(yearEnd.getUTCFullYear() + 1);
+  if (end && yearEnd > end) yearEnd = end;
+
+  out.arrElapsedPct = elapsedFraction(yearStart, yearEnd, today);
+  if (capacityArr > 0) out.arrConsumedPct = burnedThisYear / capacityArr;
+  if (out.arrConsumedPct != null && out.arrElapsedPct > 0) out.arrMultiple = out.arrConsumedPct / out.arrElapsedPct;
+
+  if (end) out.tcvElapsedPct = elapsedFraction(start, end, today);
+  if (tcvRecurring > 0) out.tcvConsumedPct = burnedLifeToDate / tcvRecurring;
+  if (out.tcvConsumedPct != null && out.tcvElapsedPct > 0) out.tcvMultiple = out.tcvConsumedPct / out.tcvElapsedPct;
+
+  return out;
+}
+
+function pacingHealthCategory(multiple) {
+  if (multiple == null) return null;
+  if (multiple > 1.15) return 'over';
+  if (multiple >= 0.85) return 'ontrack';
+  if (multiple >= 0.50) return 'under';
+  return 'sigunder';
+}
+const PACING_CATEGORY_LABELS = { over: 'Overpacing', ontrack: 'On track', under: 'Underpacing', sigunder: 'Significantly underpacing' };
+const PACING_CATEGORY_KEYS = ['over', 'ontrack', 'under', 'sigunder'];
 
 // ─── YTD ARR PERFORMANCE ──────────────────────────────
 // FY27 fiscal quarters (Amperity FY: Q1=Feb-Apr, Q2=May-Jul, Q3=Aug-Oct, Q4=Nov-Jan),
@@ -1396,13 +1503,16 @@ function buildHealthTable(rows){
 }
 
 let consumptionData = [];
-let consumptionSortCol = 2, consumptionSortAsc = false; // default: ARR (Capacity) desc
+let consumptionSortCol = 2, consumptionSortAsc = false; // default: ARR/TCV (col 2) desc
+let consumptionMetricMode = 'arr'; // 'arr' | 'tcv' — toggled by setConsumptionMetric()
 
-function pctBurnedClass(v) {
-  if (v == null) return '';
-  if (v > 1) return 'cov-bad';
-  if (v >= 0.7) return 'cov-warn';
-  return 'cov-good';
+function setConsumptionMetric(mode) {
+  consumptionMetricMode = mode;
+  document.querySelectorAll('#consumptionMetricToggle .metric-toggle-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  buildConsumptionCards(consumptionData);
+  filterConsumptionTable();
 }
 
 function wowClass(v) {
@@ -1412,15 +1522,42 @@ function wowClass(v) {
   return 'var-flat';
 }
 
+// One card per health category (Overpacing / On track / Underpacing / Significantly
+// underpacing) for whichever basis (ARR or TCV) is currently toggled — count, basis-$
+// sum, avg % consumed, avg % time elapsed, and the multiple of those two averages.
 function buildConsumptionCards(rows) {
-  const totalCapacity = rows.reduce((s, r) => s + r.capacityArr, 0);
-  const withPct = rows.filter(r => r.pctBurned != null);
-  const avgPct = withPct.length ? withPct.reduce((s, r) => s + r.pctBurned, 0) / withPct.length : null;
-  const overPace = rows.filter(r => r.pacePct != null && r.pacePct > 1.10).length;
-  document.getElementById('con-total').textContent = rows.length;
-  document.getElementById('con-capacity').textContent = K(totalCapacity);
-  document.getElementById('con-avgpct').textContent = avgPct != null ? PCT(avgPct) : '—';
-  document.getElementById('con-overpace').textContent = overPace;
+  const mode = consumptionMetricMode;
+  const basisLabel = mode === 'tcv' ? 'TCV' : 'ARR';
+  const basisVal = r => mode === 'tcv' ? r.tcvRecurring : r.capacityArr;
+  const consumedVal = r => mode === 'tcv' ? r.tcvConsumedPct : r.arrConsumedPct;
+  const elapsedVal = r => mode === 'tcv' ? r.tcvElapsedPct : r.arrElapsedPct;
+  const healthVal = r => mode === 'tcv' ? r.tcvHealth : r.arrHealth;
+
+  const groups = { over: [], ontrack: [], under: [], sigunder: [] };
+  for (const r of rows) {
+    const h = healthVal(r);
+    if (h && groups[h]) groups[h].push(r);
+  }
+
+  const html = PACING_CATEGORY_KEYS.map(key => {
+    const list = groups[key];
+    const count = list.length;
+    const basisSum = list.reduce((s, r) => s + basisVal(r), 0);
+    const consumedVals = list.map(consumedVal).filter(v => v != null);
+    const elapsedVals = list.map(elapsedVal).filter(v => v != null);
+    const avgConsumed = consumedVals.length ? consumedVals.reduce((s, v) => s + v, 0) / consumedVals.length : null;
+    const avgElapsed = elapsedVals.length ? elapsedVals.reduce((s, v) => s + v, 0) / elapsedVals.length : null;
+    const multiple = (avgConsumed != null && avgElapsed > 0) ? avgConsumed / avgElapsed : null;
+    return `<div class="pace-card pace-cat-${key}">
+      <div class="pace-card-title">${PACING_CATEGORY_LABELS[key]}</div>
+      <div class="pace-card-count">${count} customer${count !== 1 ? 's' : ''}</div>
+      <div class="pace-card-row"><span>${basisLabel}</span><b>${K(basisSum)}</b></div>
+      <div class="pace-card-row"><span>Avg consumed</span><b>${avgConsumed != null ? PCT(avgConsumed) : '—'}</b></div>
+      <div class="pace-card-row"><span>Avg time elapsed</span><b>${avgElapsed != null ? PCT(avgElapsed) : '—'}</b></div>
+      <div class="pace-card-multiple">${multiple != null ? PCT(multiple) : '—'}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('consumptionCardsRow').innerHTML = html;
 }
 
 function filterConsumptionTable() {
@@ -1436,9 +1573,21 @@ function sortConsumptionTable(col) {
 }
 
 function renderConsumptionTable(rows) {
+  const mode = consumptionMetricMode;
+  const basisLabel = mode === 'tcv' ? 'TCV (excl. one-time)' : 'ARR (Cap.)';
+  const basisVal = r => mode === 'tcv' ? r.tcvRecurring : r.capacityArr;
+  const consumedVal = r => mode === 'tcv' ? r.tcvConsumedPct : r.arrConsumedPct;
+  const elapsedVal = r => mode === 'tcv' ? r.tcvElapsedPct : r.arrElapsedPct;
+  const multipleVal = r => mode === 'tcv' ? r.tcvMultiple : r.arrMultiple;
+  const healthVal = r => mode === 'tcv' ? r.tcvHealth : r.arrHealth;
+
   const getVal = (r, col) => [
-    r.name, r.vertical, r.capacityArr, r.contractStart, r.contractEnd, r.burned,
-    r.pctBurned == null ? -1 : r.pctBurned, r.pacePct == null ? -1 : r.pacePct, r.wowPct == null ? -999 : r.wowPct
+    r.name, r.vertical, basisVal(r), r.contractStart, r.contractEnd,
+    consumedVal(r) == null ? -1 : consumedVal(r),
+    elapsedVal(r) == null ? -1 : elapsedVal(r),
+    multipleVal(r) == null ? -1 : multipleVal(r),
+    PACING_CATEGORY_LABELS[healthVal(r)] || '',
+    r.pacePct == null ? -1 : r.pacePct, r.wowPct == null ? -999 : r.wowPct
   ][col];
   const sorted = [...rows].sort((a, b) => {
     const av = getVal(a, consumptionSortCol), bv = getVal(b, consumptionSortCol);
@@ -1446,11 +1595,12 @@ function renderConsumptionTable(rows) {
     return consumptionSortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
   });
 
-  const headers = ['Customer', 'Vertical', 'ARR (Cap.)', 'Contract Start', 'Contract End', 'Burned YTD', '% Used', '4-Wk Pace', '4-Wk Trend'];
+  const headers = ['Customer', 'Vertical', basisLabel, 'Contract Start', 'Contract End', '% Consumed', 'Time Elapsed', 'Multiple', 'Health', '4-Wk Pace', '4-Wk Trend'];
   const colgroup = `<colgroup>
-    <col style="width:17%"><col style="width:10%"><col style="width:9%">
-    <col style="width:10%"><col style="width:10%"><col style="width:9%">
-    <col style="width:9%"><col style="width:13%"><col style="width:13%">
+    <col style="width:14%"><col style="width:7%"><col style="width:9%">
+    <col style="width:8%"><col style="width:8%"><col style="width:8%">
+    <col style="width:8%"><col style="width:7%"><col style="width:11%">
+    <col style="width:10%"><col style="width:10%">
   </colgroup>`;
   let thead = colgroup + '<thead><tr>';
   headers.forEach((h, i) => {
@@ -1463,14 +1613,17 @@ function renderConsumptionTable(rows) {
   for (const r of sorted) {
     const star = r.lowConfidence ? ` <span title="Derived usage-to-dollar rate is volatile for this account — treat as directional">*</span>` : '';
     const wowLabel = r.wowPct == null ? '—' : (r.wowPct >= 0 ? '+' : '') + PCT(r.wowPct);
+    const h = healthVal(r);
     body += `<tr>
       <td title="${r.name}">${r.name}</td>
       <td class="td-left">${r.vertical || '<span style="color:#9ba3af">—</span>'}</td>
-      <td>${K(r.capacityArr)}</td>
+      <td>${K(basisVal(r))}</td>
       <td>${fmtDateShort(r.contractStart)}</td>
       <td>${fmtContractEnd(r.contractEnd)}</td>
-      <td>${K(r.burned)}</td>
-      <td class="${pctBurnedClass(r.pctBurned)}">${r.pctBurned != null ? PCT(r.pctBurned) : '—'}</td>
+      <td>${consumedVal(r) != null ? PCT(consumedVal(r)) : '—'}</td>
+      <td>${elapsedVal(r) != null ? PCT(elapsedVal(r)) : '—'}</td>
+      <td>${multipleVal(r) != null ? PCT(multipleVal(r)) : '—'}</td>
+      <td class="td-center">${h ? `<span class="pace-badge pace-cat-${h}">${PACING_CATEGORY_LABELS[h]}</span>` : '<span style="color:#9ba3af">—</span>'}</td>
       <td>${r.pacePct != null ? PCT(r.pacePct) : '—'}</td>
       <td class="${wowClass(r.wowPct)}">${wowLabel}${star}</td>
     </tr>`;
