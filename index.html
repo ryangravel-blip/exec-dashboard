@@ -590,9 +590,11 @@ const Q = {
   // DATA_TYPE='Actuals' excludes the 'In Month' (partial current month) and
   // 'Forecast' (future months) rows so nothing gets double-counted. New/churned
   // logo counts derive from the IS_NEW_DEAL_DT/IS_CHURN_DT flags + CUSTOMER_CNT.
+  // EOP_ARR uses C_ARR, not ARR — ARR undercounts (e.g. ~$73.6M vs. C_ARR's ~$80.0M
+  // for Feb'26); confirmed with Ryan this is the column other reporting uses.
   arrActuals: `
     SELECT FISCAL_QTR, FISCAL_YR, FISCAL_PERIOD, MONTH_END_DT,
-      SUM(ARR) AS EOP_ARR,
+      SUM(C_ARR) AS EOP_ARR,
       SUM(NEW_ARR) AS NEW_ARR,
       SUM(EXPANSION_ARR) AS EXPANSION_ARR,
       SUM(CHURN_ARR) AS CHURN_ARR,
