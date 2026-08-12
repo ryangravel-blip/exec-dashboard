@@ -195,6 +195,7 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
     <button class="tab-btn" id="tabBtn-consumption" onclick="showTab('consumption')">Consumption Health</button>
     <button class="tab-btn" id="tabBtn-arr" onclick="showTab('arr')">YTD ARR Performance</button>
     <button class="tab-btn" id="tabBtn-renewals" onclick="showTab('renewals')">FY27 Renewals</button>
+    <button class="tab-btn" id="tabBtn-headcount" onclick="showTab('headcount')">Headcount</button>
   </div>
   <div class="live-badge"><span class="live-dot"></span> Live · refreshes on load</div>
 </div>
@@ -364,6 +365,10 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
 
 <div class="tab-pane" id="tab-renewals">
   <div id="renewalsContent"></div>
+</div>
+
+<div class="tab-pane" id="tab-headcount">
+  <div id="headcountContent"></div>
 </div>
 
 </div>
@@ -767,6 +772,63 @@ const Q = {
         '006Ql00000Bs21hIAB'  -- GoTo Foods LLC, Q1 4/23/26 (kept: Q3 10/30/26)
       )
     ORDER BY FISCAL_QTR, CLOSE_DT`,
+
+  // Headcount tab: current headcount by parent department / department. Note the PEOPLE
+  // schema's field naming is the reverse of what it sounds like — DEPARTMENT holds the
+  // broad parent bucket (Sales, Engineering, G&A, ...) and DIVISION holds the specific
+  // team underneath it (Sales - Enterprise, SW Engineering, ...). Mapped correctly to
+  // "parent department" / "department" in the UI despite the column names.
+  headcountByDept: `
+    SELECT DEPARTMENT AS PARENT_DEPT, DIVISION AS DEPT, COUNT(*) AS HEADCOUNT
+    FROM PROD.PEOPLE.CURRENT_EMPLOYEES
+    WHERE IS_HEADCOUNT = TRUE
+    GROUP BY 1, 2
+    ORDER BY 1, 2`,
+
+  // Future-dated hires, terminations, and department transfers not yet reflected in
+  // current headcount — drives the "adjusted headcount" columns and the named
+  // upcoming-hires/upcoming-terms lists. Transfers use LAG() to find the employee's
+  // prior (source) department, since EMPLOYEE_EVENTS only stores the destination
+  // department directly on the reorg event row.
+  employeeFutureEvents: `
+    WITH ordered AS (
+      SELECT EMPLOYEE_ID, FULL_NAME, VALID_FROM_DT, DEPARTMENT, DIVISION, START_DT, DEPARTURE_DT,
+             IS_REORG_EVENT, IS_START_EVENT, IS_DEPARTURE_EVENT,
+             LAG(DEPARTMENT) OVER (PARTITION BY EMPLOYEE_ID ORDER BY VALID_FROM_DT) AS PREV_DEPARTMENT,
+             LAG(DIVISION) OVER (PARTITION BY EMPLOYEE_ID ORDER BY VALID_FROM_DT) AS PREV_DIVISION
+      FROM PROD.PEOPLE.EMPLOYEE_EVENTS
+    )
+    SELECT 'hire' AS EVENT_TYPE, FULL_NAME, DEPARTMENT, DIVISION, NULL AS PREV_DEPARTMENT, NULL AS PREV_DIVISION, START_DT AS EVENT_DT
+    FROM ordered WHERE IS_START_EVENT = TRUE AND START_DT > CURRENT_DATE()
+    UNION ALL
+    SELECT 'term', FULL_NAME, DEPARTMENT, DIVISION, NULL, NULL, DEPARTURE_DT
+    FROM ordered WHERE IS_DEPARTURE_EVENT = TRUE AND DEPARTURE_DT > CURRENT_DATE()
+    UNION ALL
+    SELECT 'transfer', FULL_NAME, DEPARTMENT, DIVISION, PREV_DEPARTMENT, PREV_DIVISION, VALID_FROM_DT
+    FROM ordered WHERE IS_REORG_EVENT = TRUE AND IS_START_EVENT = FALSE AND VALID_FROM_DT > CURRENT_DATE()
+    ORDER BY EVENT_DT`,
+
+  // Trailing 12 complete months (excludes the current in-progress month) of voluntary
+  // and involuntary terminations, for the attrition-rate table/cards.
+  terminations12mo: `
+    SELECT DATE_TRUNC('month', DEPARTURE_DT) AS MTH, TERMINATED_REASON, COUNT(*) AS CNT
+    FROM PROD.PEOPLE.EMPLOYEES
+    WHERE DEPARTURE_DT >= DATEADD(month, -12, DATE_TRUNC('month', CURRENT_DATE()))
+      AND DEPARTURE_DT < DATE_TRUNC('month', CURRENT_DATE())
+      AND TERMINATED_REASON IN ('Voluntary', 'Involuntary')
+    GROUP BY 1, 2
+    ORDER BY 1, 2`,
+
+  // Trailing 12 complete months of month-end headcount — denominator for the
+  // annualized attrition rate (terms over the 12mo window ÷ average headcount
+  // over that same window).
+  headcountMonthly12mo: `
+    SELECT MONTH_END_DT, COUNT(DISTINCT EMPLOYEE_ID) AS HC
+    FROM PROD.PEOPLE.HEADCOUNT
+    WHERE TYPE = 'employee' AND HEAD_CNT = 1 AND SNAP_DT = MONTH_END_DT
+      AND MONTH_END_DT >= DATEADD(month, -12, DATE_TRUNC('month', CURRENT_DATE()))
+      AND MONTH_END_DT < DATE_TRUNC('month', CURRENT_DATE())
+    GROUP BY 1 ORDER BY 1`,
 };
 
 // ─── PRE-PROCESS ──────────────────────────────────────
@@ -1406,6 +1468,224 @@ function buildRenewalsTab(quarters) {
   document.getElementById('renewalsContent').innerHTML = html;
 }
 
+// ─── HEADCOUNT ────────────────────────────────────────
+function preProcessHeadcount(deptRows, eventRows) {
+  const key = (p, d) => `${p}||${d}`;
+  const byKey = {};
+  const ensure = (p, d) => byKey[key(p, d)] || (byKey[key(p, d)] = {
+    parentDept: p, dept: d, current: 0, transfersOut: 0, transfersIn: 0, futureTerms: 0, futureHires: 0,
+  });
+  for (const r of deptRows) {
+    ensure(r.PARENT_DEPT, r.DEPT).current = +(r.HEADCOUNT || 0);
+  }
+  const upcomingTerms = [], upcomingHires = [];
+  for (const r of eventRows) {
+    const dt = parseDate(r.EVENT_DT);
+    if (r.EVENT_TYPE === 'hire') {
+      ensure(r.DEPARTMENT, r.DIVISION).futureHires += 1;
+      upcomingHires.push({ name: r.FULL_NAME, parentDept: r.DEPARTMENT, dept: r.DIVISION, date: dt });
+    } else if (r.EVENT_TYPE === 'term') {
+      ensure(r.DEPARTMENT, r.DIVISION).futureTerms += 1;
+      upcomingTerms.push({ name: r.FULL_NAME, parentDept: r.DEPARTMENT, dept: r.DIVISION, date: dt });
+    } else if (r.EVENT_TYPE === 'transfer') {
+      ensure(r.DEPARTMENT, r.DIVISION).transfersIn += 1;
+      if (r.PREV_DEPARTMENT) ensure(r.PREV_DEPARTMENT, r.PREV_DIVISION).transfersOut += 1;
+    }
+  }
+  upcomingTerms.sort((a, b) => a.date.localeCompare(b.date));
+  upcomingHires.sort((a, b) => a.date.localeCompare(b.date));
+
+  const byParent = {};
+  for (const row of Object.values(byKey)) {
+    (byParent[row.parentDept] = byParent[row.parentDept] || []).push(row);
+  }
+  const parents = Object.keys(byParent).sort();
+  for (const p of parents) byParent[p].sort((a, b) => a.dept.localeCompare(b.dept));
+
+  return { byParent, parents, upcomingTerms, upcomingHires };
+}
+
+function adjustedHc(row) {
+  return row.current - row.transfersOut + row.transfersIn - row.futureTerms + row.futureHires;
+}
+
+function buildHeadcountDeptTable({ byParent, parents }) {
+  let body = '';
+  const gT = { current: 0, out: 0, in: 0, terms: 0, hires: 0, adj: 0 };
+  for (const p of parents) {
+    const rows = byParent[p];
+    const pT = { current: 0, out: 0, in: 0, terms: 0, hires: 0, adj: 0 };
+    let rowsHtml = '';
+    for (const r of rows) {
+      const adj = adjustedHc(r);
+      pT.current += r.current; pT.out += r.transfersOut; pT.in += r.transfersIn;
+      pT.terms += r.futureTerms; pT.hires += r.futureHires; pT.adj += adj;
+      rowsHtml += `<tr class="ae-row">
+        <td class="lbl-indent">${r.dept}</td>
+        <td>${N(r.current)}</td>
+        <td>${r.transfersOut ? N(r.transfersOut) : '—'}</td>
+        <td>${r.transfersIn ? N(r.transfersIn) : '—'}</td>
+        <td>${r.futureTerms ? N(r.futureTerms) : '—'}</td>
+        <td>${r.futureHires ? N(r.futureHires) : '—'}</td>
+        <td><strong>${N(adj)}</strong></td>
+      </tr>`;
+    }
+    body += `<tr class="mgr-row">
+      <td class="lbl-sub">${p}</td>
+      <td>${N(pT.current)}</td>
+      <td>${pT.out ? N(pT.out) : '—'}</td>
+      <td>${pT.in ? N(pT.in) : '—'}</td>
+      <td>${pT.terms ? N(pT.terms) : '—'}</td>
+      <td>${pT.hires ? N(pT.hires) : '—'}</td>
+      <td><strong>${N(pT.adj)}</strong></td>
+    </tr>`;
+    body += rowsHtml;
+    gT.current += pT.current; gT.out += pT.out; gT.in += pT.in;
+    gT.terms += pT.terms; gT.hires += pT.hires; gT.adj += pT.adj;
+  }
+  const thead = `<colgroup>
+      <col style="width:28%"><col style="width:13%"><col style="width:13%">
+      <col style="width:13%"><col style="width:13%"><col style="width:13%"><col style="width:13%">
+    </colgroup>
+    <thead><tr>
+      <th style="cursor:default;">Parent Department / Department</th>
+      <th style="cursor:default;">Current Headcount</th>
+      <th style="cursor:default;">Transfers Out</th>
+      <th style="cursor:default;">Transfers In</th>
+      <th style="cursor:default;">Future Terms</th>
+      <th style="cursor:default;">Future Hires</th>
+      <th style="cursor:default;">Adjusted Headcount</th>
+    </tr></thead>`;
+  const totalRow = `<tr class="total-row">
+    <td class="lbl-sub">Total</td>
+    <td>${N(gT.current)}</td>
+    <td>${gT.out ? N(gT.out) : '—'}</td>
+    <td>${gT.in ? N(gT.in) : '—'}</td>
+    <td>${gT.terms ? N(gT.terms) : '—'}</td>
+    <td>${gT.hires ? N(gT.hires) : '—'}</td>
+    <td><strong>${N(gT.adj)}</strong></td>
+  </tr>`;
+  return `<table class="custarr-table">${thead}<tbody>${body}${totalRow}</tbody></table>`;
+}
+
+function buildHeadcountEventList(title, hint, events, dateLabel) {
+  const rows = events.map(e => `
+    <tr>
+      <td title="${e.name}">${e.name}</td>
+      <td class="td-left">${e.parentDept}</td>
+      <td class="td-left">${e.dept}</td>
+      <td>${fmtDateShort(e.date)}</td>
+    </tr>`).join('');
+  return `
+    <div class="section-title">${title} <span class="hint">${hint}</span></div>
+    <div class="table-card" style="overflow-x:auto;">
+      <table class="custarr-table">
+        <colgroup><col style="width:34%"><col style="width:22%"><col style="width:24%"><col style="width:20%"></colgroup>
+        <thead><tr>
+          <th style="cursor:default;">Name</th>
+          <th style="cursor:default;">Parent Department</th>
+          <th style="cursor:default;">Department</th>
+          <th style="cursor:default;">${dateLabel}</th>
+        </tr></thead>
+        <tbody>${rows || `<tr><td colspan="4" style="text-align:center;color:#9ba3af;">None scheduled</td></tr>`}</tbody>
+      </table>
+    </div>`;
+}
+
+// Trailing 12 complete calendar months, oldest first, ending the month before the
+// current one (matches the SQL queries' DATEADD(month,-12,...) / < this-month window).
+function trailing12MonthKeys() {
+  const now = new Date();
+  const keys = [];
+  for (let i = 12; i >= 1; i--) {
+    let mm = now.getMonth() - i, yy = now.getFullYear();
+    while (mm < 0) { mm += 12; yy -= 1; }
+    keys.push(`${yy}-${String(mm + 1).padStart(2, '0')}`);
+  }
+  return keys;
+}
+
+function preProcessAttrition(termRows, hcRows) {
+  const months = trailing12MonthKeys();
+  const volByMonth = {}, involByMonth = {};
+  for (const r of termRows) {
+    const mth = parseDate(r.MTH).slice(0, 7);
+    const cnt = +(r.CNT || 0);
+    if (r.TERMINATED_REASON === 'Voluntary') volByMonth[mth] = (volByMonth[mth] || 0) + cnt;
+    else if (r.TERMINATED_REASON === 'Involuntary') involByMonth[mth] = (involByMonth[mth] || 0) + cnt;
+  }
+  const hcByMonth = {};
+  for (const r of hcRows) hcByMonth[parseDate(r.MONTH_END_DT).slice(0, 7)] = +(r.HC || 0);
+  const hcVals = months.map(m => hcByMonth[m]).filter(v => v != null);
+  const avgHc = hcVals.length ? hcVals.reduce((s, v) => s + v, 0) / hcVals.length : null;
+  const totalVol = months.reduce((s, m) => s + (volByMonth[m] || 0), 0);
+  const totalInvol = months.reduce((s, m) => s + (involByMonth[m] || 0), 0);
+  return {
+    months, volByMonth, involByMonth, avgHc,
+    volRate: avgHc ? totalVol / avgHc : null,
+    involRate: avgHc ? totalInvol / avgHc : null,
+    totalRate: avgHc ? (totalVol + totalInvol) / avgHc : null,
+    totalVol, totalInvol,
+  };
+}
+
+function monthLabel(key) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+}
+
+function buildAttritionSection(a) {
+  const totalsByMonth = a.months.map(m => (a.volByMonth[m] || 0) + (a.involByMonth[m] || 0));
+  const monthHeaders = a.months.map(m => `<th style="cursor:default;">${monthLabel(m)}</th>`).join('');
+  const volCells = a.months.map(m => `<td>${a.volByMonth[m] ? N(a.volByMonth[m]) : '—'}</td>`).join('');
+  const involCells = a.months.map(m => `<td>${a.involByMonth[m] ? N(a.involByMonth[m]) : '—'}</td>`).join('');
+  const totalCells = totalsByMonth.map(v => `<td>${v ? N(v) : '—'}</td>`).join('');
+  return `
+    <div class="section-title">Trailing 12-month terminations <span class="hint">PROD.PEOPLE.EMPLOYEES · voluntary vs. involuntary, by month departed</span></div>
+    <div class="table-card" style="overflow-x:auto;">
+      <table class="custarr-table">
+        <thead><tr><th style="cursor:default;">&nbsp;</th>${monthHeaders}<th style="cursor:default;">Total (12mo)</th></tr></thead>
+        <tbody>
+          <tr><td class="td-left">Voluntary</td>${volCells}<td><strong>${N(a.totalVol)}</strong></td></tr>
+          <tr><td class="td-left">Involuntary</td>${involCells}<td><strong>${N(a.totalInvol)}</strong></td></tr>
+          <tr class="total-row"><td class="td-left lbl-sub">Total</td>${totalCells}<td><strong>${N(a.totalVol + a.totalInvol)}</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="cards-row" style="margin-top:14px;">
+      <div class="stat-card">
+        <div class="sc-label">Annualized voluntary attrition</div>
+        <div class="sc-value">${PCT(a.volRate, 1)}</div>
+        <div class="sc-sub">${N(a.totalVol)} voluntary terms ÷ ${a.avgHc != null ? a.avgHc.toFixed(0) : '—'} avg headcount</div>
+      </div>
+      <div class="stat-card warn">
+        <div class="sc-label">Annualized involuntary attrition</div>
+        <div class="sc-value">${PCT(a.involRate, 1)}</div>
+        <div class="sc-sub">${N(a.totalInvol)} involuntary terms ÷ ${a.avgHc != null ? a.avgHc.toFixed(0) : '—'} avg headcount</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">Annualized total attrition</div>
+        <div class="sc-value">${PCT(a.totalRate, 1)}</div>
+        <div class="sc-sub">${N(a.totalVol + a.totalInvol)} total terms ÷ ${a.avgHc != null ? a.avgHc.toFixed(0) : '—'} avg headcount</div>
+      </div>
+    </div>`;
+}
+
+function buildHeadcountTab(deptRows, eventRows, termRows, hcRows) {
+  const hc = preProcessHeadcount(deptRows, eventRows);
+  const attr = preProcessAttrition(termRows, hcRows);
+  const html = `
+    <div class="section-title">Headcount by parent department <span class="hint">PROD.PEOPLE.CURRENT_EMPLOYEES (current) + EMPLOYEE_EVENTS (future-dated hires/terms/transfers) · Adjusted = Current − Transfers Out + Transfers In − Future Terms + Future Hires</span></div>
+    <div class="table-card" style="overflow-x:auto;">
+      ${buildHeadcountDeptTable(hc)}
+    </div>
+    ${buildHeadcountEventList('Upcoming terminations', 'Future-dated departures not yet reflected in current headcount', hc.upcomingTerms, 'Term Date')}
+    ${buildHeadcountEventList('Upcoming new hires', 'Accepted offers with a future start date', hc.upcomingHires, 'Start Date')}
+    ${buildAttritionSection(attr)}
+  `;
+  document.getElementById('headcountContent').innerHTML = html;
+}
+
 function tagHtml(type) {
   const cls = type==='Subscription'?'tag-sub':type==='Consumption'?'tag-con':'tag-unk';
   return `<span class="tag ${cls}">${type}</span>`;
@@ -1853,10 +2133,11 @@ async function loadAll() {
     msg.textContent = 'Connecting to Snowflake…';
     await waitForCowork();
     msg.textContent = 'Fetching pipeline, closed deals, quotas, customer health, and consumption…';
-    const [pipeRows, closedRows, tgtRows, healthRows, rvpSelfRows, conCapRows, conRateRows, conWeekRows, arrActualRows, arrPlanRows, arrLogoRows, renewalRows, tenureRows] = await Promise.all([
+    const [pipeRows, closedRows, tgtRows, healthRows, rvpSelfRows, conCapRows, conRateRows, conWeekRows, arrActualRows, arrPlanRows, arrLogoRows, renewalRows, tenureRows, hcDeptRows, hcEventRows, hcTermRows, hcMonthlyRows] = await Promise.all([
       execSQL(Q.pipeline), execSQL(Q.closedFYTD), execSQL(Q.salesTargets), execSQL(Q.customerHealth), execSQL(Q.rvpSelfOwnedDeals),
       execSQL(Q.consumptionCapacity), execSQL(Q.consumptionRateInputs), execSQL(Q.consumptionWeeklyUsage),
-      execSQL(Q.arrActuals), execSQL(Q.arrPlan), execSQL(Q.arrLogoEvents), execSQL(Q.renewalDeals), execSQL(Q.employeeTenure)
+      execSQL(Q.arrActuals), execSQL(Q.arrPlan), execSQL(Q.arrLogoEvents), execSQL(Q.renewalDeals), execSQL(Q.employeeTenure),
+      execSQL(Q.headcountByDept), execSQL(Q.employeeFutureEvents), execSQL(Q.terminations12mo), execSQL(Q.headcountMonthly12mo)
     ]);
     msg.textContent = 'Building dashboard…';
     const deals = preProcessPipeline(pipeRows);
@@ -1874,6 +2155,7 @@ async function loadAll() {
     buildConsumptionTable(consumption);
     buildArrPerformance(arrActualRows, arrPlanRows, arrLogoRows);
     buildRenewalsTab(preProcessRenewals(renewalRows));
+    buildHeadcountTab(hcDeptRows, hcEventRows, hcTermRows, hcMonthlyRows);
 
     document.getElementById('loadingOverlay').style.display = 'none';
   } catch (e) {
