@@ -126,6 +126,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .pace-badge.pace-cat-under { background: #fdf3d9; color: #92400e; }
 .pace-badge.pace-cat-sigunder { background: #fbe9e9; color: #b91c1c; }
 
+.rep-tenure { font-size: 10.5px; color: #9ba3af; font-weight: 400; }
+
 /* FY27 Renewals: outcome badges + quarter blocks */
 .outcome-badge { display: inline-block; font-size: 10.5px; font-weight: 700; border-radius: 4px; padding: 2px 8px; white-space: nowrap; }
 .outcome-badge.outcome-full { background: #e7f5ea; color: #15803d; }
@@ -383,6 +385,24 @@ const NAME_ALIAS = {
 // Reps to drop from every view (e.g. no longer with the company / placeholder rows).
 const EXCLUDED_REPS = new Set(['Kevin Kovacevich']);
 
+// Bridges the dashboard's display name (post-NAME_ALIAS) to PROD.PEOPLE.EMPLOYEES.FULL_NAME
+// for reps whose HR record uses a different name than Salesforce/the dashboard does.
+const HIRE_NAME_ALIAS = {
+  'Kris Hook': 'Kristine Hook',
+  'Chris Hemmings': 'Christopher Hemmings',
+  'Rob Pope': 'Rob Pope, Jr.',
+  'Jeffrey Dome': 'Jeff Dome',
+};
+function tenureYears(tenureMap, repName) {
+  const startDt = tenureMap[HIRE_NAME_ALIAS[repName] || repName];
+  if (!startDt) return null;
+  return (new Date() - new Date(startDt + 'T00:00:00Z')) / (365.25 * 86400000);
+}
+function tenureHtml(years) {
+  if (years == null) return '';
+  return ` <span class="rep-tenure">${years.toFixed(1)}y</span>`;
+}
+
 // CLOSE_FISCAL_PERIOD values are labeled '2027 Qn' for FY27 (Feb 2026–Jan 2027) —
 // same offset-by-one convention Snowflake uses elsewhere in this workspace.
 const CURRENT_FY_PREFIX = '2027 ';
@@ -456,6 +476,16 @@ async function execSQL(sql) {
 
 // ─── QUERIES ──────────────────────────────────────────
 const Q = {
+  // Hire dates for the Rep Productivity table's "years since hired" tenure figure.
+  // PROD.PEOPLE.EMPLOYEES (not CURRENT_EMPLOYEES) so reps who've since left but still
+  // show up in closed/pipeline history (e.g. Rob Pope) still get a tenure value.
+  // QUALIFY picks each person's most recent START_DT if they have multiple stints.
+  employeeTenure: `
+    SELECT FULL_NAME, START_DT
+    FROM PROD.PEOPLE.EMPLOYEES
+    WHERE JOB_TITLE ILIKE '%Sales%' OR JOB_TITLE ILIKE '%RVP%'
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY FULL_NAME ORDER BY START_DT DESC) = 1`,
+
   // All open, non-SQL-stage pipeline with per-deal detail — powers rep productivity,
   // quarter coverage, and the late-stage deal list from a single round trip.
   pipeline: `
@@ -1437,7 +1467,7 @@ function buildCards(deals, closed, tgt){
     </div>`).join('');
 }
 
-function buildRepTable(deals, closed, tgt, rvpSelfDeals){
+function buildRepTable(deals, closed, tgt, rvpSelfDeals, tenureMap){
   const byRep = {};
   for (const d of deals) {
     if (!byRep[d.owner]) byRep[d.owner] = { rvp: d.rvp, stages:{}, total:0, fyTotal:0 };
@@ -1503,7 +1533,7 @@ function buildRepTable(deals, closed, tgt, rvpSelfDeals){
       mS[0]+=s1;mS[1]+=s2;mS[2]+=s3;mS[3]+=s4;mS[4]+=s5;
       mOpenFY+=openFY; mAllTime+=allTime; mClosed+=cl;
       repRows += `<tr class="ae-row">
-        <td class="lbl-indent">${rep}</td>
+        <td class="lbl-indent">${rep}${tenureHtml(tenureYears(tenureMap, rep))}</td>
         <td>${K(cl)}</td><td>${ytdq?K(ytdq):'—'}</td><td>${pctToQuota!=null?PCT(pctToQuota):'—'}</td>
         <td>${s1?K(s1):'—'}</td><td>${s2?K(s2):'—'}</td><td>${s3?K(s3):'—'}</td><td>${s4?K(s4):'—'}</td><td>${s5?K(s5):'—'}</td>
         <td>${K(openFY)}</td><td>${annual?K(remaining):'—'}</td><td class="${covClass(covFY)}">${covFY!=null?covFY.toFixed(1)+'x':'—'}</td>
@@ -1523,7 +1553,7 @@ function buildRepTable(deals, closed, tgt, rvpSelfDeals){
     const mCovAnnual = mRemaining>0 ? mAllTime/mRemaining : null;
     const mPctToQuota = mYtdQ>0 ? mClosed/mYtdQ : null;
     h += `<tr class="mgr-row">
-      <td class="lbl-sub">${mgr}</td>
+      <td class="lbl-sub">${mgr}${mgr !== 'Unassigned' ? tenureHtml(tenureYears(tenureMap, mgr)) : ''}</td>
       <td>${K(mClosed)}</td><td>${mYtdQ?K(mYtdQ):'—'}</td><td>${mPctToQuota!=null?PCT(mPctToQuota):'—'}</td>
       <td>${mS[0]?K(mS[0]):'—'}</td><td>${mS[1]?K(mS[1]):'—'}</td><td>${mS[2]?K(mS[2]):'—'}</td><td>${mS[3]?K(mS[3]):'—'}</td><td>${mS[4]?K(mS[4]):'—'}</td>
       <td>${K(mOpenFY)}</td><td>${mAnnual?K(mRemaining):'—'}</td><td class="${covClass(mCovFY)}">${mCovFY!=null?mCovFY.toFixed(1)+'x':'—'}</td>
@@ -1818,10 +1848,10 @@ async function loadAll() {
     msg.textContent = 'Connecting to Snowflake…';
     await waitForCowork();
     msg.textContent = 'Fetching pipeline, closed deals, quotas, customer health, and consumption…';
-    const [pipeRows, closedRows, tgtRows, healthRows, rvpSelfRows, conCapRows, conRateRows, conWeekRows, arrActualRows, arrPlanRows, arrLogoRows, renewalRows] = await Promise.all([
+    const [pipeRows, closedRows, tgtRows, healthRows, rvpSelfRows, conCapRows, conRateRows, conWeekRows, arrActualRows, arrPlanRows, arrLogoRows, renewalRows, tenureRows] = await Promise.all([
       execSQL(Q.pipeline), execSQL(Q.closedFYTD), execSQL(Q.salesTargets), execSQL(Q.customerHealth), execSQL(Q.rvpSelfOwnedDeals),
       execSQL(Q.consumptionCapacity), execSQL(Q.consumptionRateInputs), execSQL(Q.consumptionWeeklyUsage),
-      execSQL(Q.arrActuals), execSQL(Q.arrPlan), execSQL(Q.arrLogoEvents), execSQL(Q.renewalDeals)
+      execSQL(Q.arrActuals), execSQL(Q.arrPlan), execSQL(Q.arrLogoEvents), execSQL(Q.renewalDeals), execSQL(Q.employeeTenure)
     ]);
     msg.textContent = 'Building dashboard…';
     const deals = preProcessPipeline(pipeRows);
@@ -1830,9 +1860,11 @@ async function loadAll() {
     const health = preProcessCustomerHealth(healthRows);
     const rvpSelfDeals = preProcessRvpSelfDeals(rvpSelfRows);
     const consumption = preProcessConsumption(conCapRows, conRateRows, conWeekRows);
+    const tenureMap = {};
+    for (const r of tenureRows) tenureMap[r.FULL_NAME] = parseDate(r.START_DT);
 
     buildCards(deals, closed, tgt);
-    buildRepTable(deals, closed, tgt, rvpSelfDeals);
+    buildRepTable(deals, closed, tgt, rvpSelfDeals, tenureMap);
     buildHealthTable(health);
     buildConsumptionTable(consumption);
     buildArrPerformance(arrActualRows, arrPlanRows, arrLogoRows);
