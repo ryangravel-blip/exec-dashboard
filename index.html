@@ -126,6 +126,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .pace-badge.pace-cat-under { background: #fdf3d9; color: #92400e; }
 .pace-badge.pace-cat-sigunder { background: #fbe9e9; color: #b91c1c; }
 
+/* FY27 Renewals: outcome badges + quarter blocks */
+.outcome-badge { display: inline-block; font-size: 10.5px; font-weight: 700; border-radius: 4px; padding: 2px 8px; white-space: nowrap; }
+.outcome-badge.outcome-full { background: #e7f5ea; color: #15803d; }
+.outcome-badge.outcome-downgrade { background: #fdf3d9; color: #92400e; }
+.outcome-badge.outcome-churn { background: #fbe9e9; color: #b91c1c; }
+.outcome-badge.outcome-pending { background: #f1f2f4; color: #6b7280; }
+.renewals-qtr-block { margin-bottom: 34px; }
+.renewals-qtr-block .cards-row { margin-bottom: 14px; }
+
 /* YTD ARR Performance: grid of small Actual-vs-Plan bar charts + one EOP trend chart */
 .arr-charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 20px; }
 .arr-charts-grid .chart-card { height: 280px; margin-bottom: 0; }
@@ -183,6 +192,7 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
     <button class="tab-btn" id="tabBtn-health" onclick="showTab('health')">Customer Health</button>
     <button class="tab-btn" id="tabBtn-consumption" onclick="showTab('consumption')">Consumption Health</button>
     <button class="tab-btn" id="tabBtn-arr" onclick="showTab('arr')">YTD ARR Performance</button>
+    <button class="tab-btn" id="tabBtn-renewals" onclick="showTab('renewals')">FY27 Renewals</button>
   </div>
   <div class="live-badge"><span class="live-dot"></span> Live · refreshes on load</div>
 </div>
@@ -348,6 +358,10 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
     <div class="chart-card"><canvas id="chart-upForRenewal"></canvas></div>
     <div class="chart-card arr-chart-card-wide"><canvas id="chart-eopArr"></canvas></div>
   </div>
+</div>
+
+<div class="tab-pane" id="tab-renewals">
+  <div id="renewalsContent"></div>
 </div>
 
 </div>
@@ -698,6 +712,20 @@ const Q = {
     WHERE DATA_TYPE = 'Actuals' AND FISCAL_YR = ${parseInt(CURRENT_FY_PREFIX)}
       AND (IS_NEW_DEAL_DT OR IS_CHURN_DT)
     ORDER BY FISCAL_QTR, MONTH_END_DT`,
+
+  // FY27 Renewals tab: every Salesforce opportunity with a non-zero renewal amount,
+  // for FY27 (Feb'26-Jan'27). EXPECTED_RENEWAL_OUTCOME drives the Full/Downgrade/Churn
+  // color coding the user asked for. EXPECTED_RENEWAL_ARR is the resulting ARR after
+  // the renewal (0 for Churn, reduced for Downgrade, same as ARR_UP_FOR_RENEWAL for
+  // Full) — validated against sample data, so SUM(EXPECTED_RENEWAL_ARR)/SUM(ARR_UP_FOR_RENEWAL)
+  // gives a clean gross-retention % without double-counting churn.
+  renewalDeals: `
+    SELECT FISCAL_QTR, ACCOUNT_NAME, ARR_UP_FOR_RENEWAL, EXPECTED_RENEWAL_OUTCOME,
+           EXPECTED_RENEWAL_ARR, CLOSE_DT
+    FROM PROD.SALESFORCE.OPPORTUNITIES
+    WHERE FISCAL_YR = ${parseInt(CURRENT_FY_PREFIX)}
+      AND ARR_UP_FOR_RENEWAL IS NOT NULL AND ARR_UP_FOR_RENEWAL != 0
+    ORDER BY FISCAL_QTR, CLOSE_DT`,
 };
 
 // ─── PRE-PROCESS ──────────────────────────────────────
@@ -1247,6 +1275,90 @@ function buildArrPerformance(actualRows, planRows, logoRows) {
   buildArrLogoLists(pp);
 }
 
+// ─── FY27 RENEWALS ────────────────────────────────────
+function preProcessRenewals(rows) {
+  const byQtr = { 1: [], 2: [], 3: [], 4: [] };
+  for (const r of rows) {
+    const q = +r.FISCAL_QTR;
+    if (!byQtr[q]) continue;
+    const outcomeRaw = (r.EXPECTED_RENEWAL_OUTCOME || '').trim();
+    byQtr[q].push({
+      name: r.ACCOUNT_NAME,
+      upForRenewal: +(r.ARR_UP_FOR_RENEWAL || 0),
+      outcome: outcomeRaw,
+      expectedArr: (r.EXPECTED_RENEWAL_ARR === '' || r.EXPECTED_RENEWAL_ARR == null) ? null : +r.EXPECTED_RENEWAL_ARR,
+      closeDt: parseDate(r.CLOSE_DT),
+    });
+  }
+  return [1, 2, 3, 4].map(q => {
+    const deals = byQtr[q].slice().sort((a, b) => a.closeDt.localeCompare(b.closeDt));
+    const upForRenewal = deals.reduce((s, d) => s + d.upForRenewal, 0);
+    const churned = deals.filter(d => d.outcome === 'Churn').reduce((s, d) => s + d.upForRenewal, 0);
+    const renewed = deals.reduce((s, d) => s + (d.expectedArr != null ? d.expectedArr : 0), 0);
+    const grr = upForRenewal > 0 ? renewed / upForRenewal : null;
+    return { q, deals, upForRenewal, churned, renewed, grr };
+  });
+}
+
+function outcomeBadge(outcome) {
+  if (outcome === 'Full') return `<span class="outcome-badge outcome-full">Full</span>`;
+  if (outcome === 'Downgrade') return `<span class="outcome-badge outcome-downgrade">Downgrade</span>`;
+  if (outcome === 'Churn') return `<span class="outcome-badge outcome-churn">Churn</span>`;
+  return `<span class="outcome-badge outcome-pending">Pending</span>`;
+}
+
+function buildRenewalsTab(quarters) {
+  const html = quarters.map(({ q, deals, upForRenewal, churned, renewed, grr }) => {
+    const rows = deals.map(d => `
+      <tr>
+        <td title="${d.name}">${d.name}</td>
+        <td>${fmtDateShort(d.closeDt)}</td>
+        <td>${K(d.upForRenewal)}</td>
+        <td class="td-center">${outcomeBadge(d.outcome)}</td>
+        <td>${d.expectedArr != null ? K(d.expectedArr) : '<span style="color:#9ba3af">—</span>'}</td>
+      </tr>`).join('');
+    return `
+      <div class="renewals-qtr-block">
+        <div class="section-title">Q${q} FY27 <span class="hint">${deals.length} deal${deals.length === 1 ? '' : 's'} up for renewal</span></div>
+        <div class="cards-row">
+          <div class="stat-card">
+            <div class="sc-label">Up for renewal</div>
+            <div class="sc-value">${K(upForRenewal)}</div>
+          </div>
+          <div class="stat-card good">
+            <div class="sc-label">Renewed</div>
+            <div class="sc-value">${K(renewed)}</div>
+          </div>
+          <div class="stat-card warn">
+            <div class="sc-label">Churned</div>
+            <div class="sc-value">${K(churned)}</div>
+          </div>
+          <div class="stat-card">
+            <div class="sc-label">Gross retention</div>
+            <div class="sc-value">${PCT(grr)}</div>
+          </div>
+        </div>
+        <div class="table-card" style="overflow-x:auto;">
+          <table class="custarr-table">
+            <colgroup>
+              <col style="width:34%"><col style="width:16%"><col style="width:16%">
+              <col style="width:18%"><col style="width:16%">
+            </colgroup>
+            <thead><tr>
+              <th style="cursor:default;">Customer</th>
+              <th style="cursor:default;">Close Date</th>
+              <th style="cursor:default;">ARR Up for Renewal</th>
+              <th style="cursor:default;">Expected Outcome</th>
+              <th style="cursor:default;">Expected Renewal ARR</th>
+            </tr></thead>
+            <tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#9ba3af;">No renewals this quarter</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>`;
+  }).join('');
+  document.getElementById('renewalsContent').innerHTML = html;
+}
+
 function tagHtml(type) {
   const cls = type==='Subscription'?'tag-sub':type==='Consumption'?'tag-con':'tag-unk';
   return `<span class="tag ${cls}">${type}</span>`;
@@ -1689,10 +1801,10 @@ async function loadAll() {
     msg.textContent = 'Connecting to Snowflake…';
     await waitForCowork();
     msg.textContent = 'Fetching pipeline, closed deals, quotas, customer health, and consumption…';
-    const [pipeRows, closedRows, tgtRows, healthRows, rvpSelfRows, conCapRows, conRateRows, conWeekRows, arrActualRows, arrPlanRows, arrLogoRows] = await Promise.all([
+    const [pipeRows, closedRows, tgtRows, healthRows, rvpSelfRows, conCapRows, conRateRows, conWeekRows, arrActualRows, arrPlanRows, arrLogoRows, renewalRows] = await Promise.all([
       execSQL(Q.pipeline), execSQL(Q.closedFYTD), execSQL(Q.salesTargets), execSQL(Q.customerHealth), execSQL(Q.rvpSelfOwnedDeals),
       execSQL(Q.consumptionCapacity), execSQL(Q.consumptionRateInputs), execSQL(Q.consumptionWeeklyUsage),
-      execSQL(Q.arrActuals), execSQL(Q.arrPlan), execSQL(Q.arrLogoEvents)
+      execSQL(Q.arrActuals), execSQL(Q.arrPlan), execSQL(Q.arrLogoEvents), execSQL(Q.renewalDeals)
     ]);
     msg.textContent = 'Building dashboard…';
     const deals = preProcessPipeline(pipeRows);
@@ -1707,6 +1819,7 @@ async function loadAll() {
     buildHealthTable(health);
     buildConsumptionTable(consumption);
     buildArrPerformance(arrActualRows, arrPlanRows, arrLogoRows);
+    buildRenewalsTab(preProcessRenewals(renewalRows));
 
     document.getElementById('loadingOverlay').style.display = 'none';
   } catch (e) {
