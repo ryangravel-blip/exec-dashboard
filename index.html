@@ -808,25 +808,27 @@ const Q = {
     FROM ordered WHERE IS_REORG_EVENT = TRUE AND IS_START_EVENT = FALSE AND VALID_FROM_DT > CURRENT_DATE()
     ORDER BY EVENT_DT`,
 
-  // Trailing 12 complete months (excludes the current in-progress month) of voluntary
-  // and involuntary terminations, for the attrition-rate table/cards.
-  terminations12mo: `
+  // Trailing 24 complete months (excludes the current in-progress month) of voluntary
+  // and involuntary terminations. Pulls 24mo, not just 12, so the trend chart can plot
+  // a rolling trailing-12-month annualized rate at each of the last 12 month-ends —
+  // the earliest of those 12 points still needs the 12 months before it.
+  terminationsTrend: `
     SELECT DATE_TRUNC('month', DEPARTURE_DT) AS MTH, TERMINATED_REASON, COUNT(*) AS CNT
     FROM PROD.PEOPLE.EMPLOYEES
-    WHERE DEPARTURE_DT >= DATEADD(month, -12, DATE_TRUNC('month', CURRENT_DATE()))
+    WHERE DEPARTURE_DT >= DATEADD(month, -24, DATE_TRUNC('month', CURRENT_DATE()))
       AND DEPARTURE_DT < DATE_TRUNC('month', CURRENT_DATE())
       AND TERMINATED_REASON IN ('Voluntary', 'Involuntary')
     GROUP BY 1, 2
     ORDER BY 1, 2`,
 
-  // Trailing 12 complete months of month-end headcount — denominator for the
-  // annualized attrition rate (terms over the 12mo window ÷ average headcount
-  // over that same window).
-  headcountMonthly12mo: `
+  // Trailing 24 complete months of month-end headcount — denominator for the rolling
+  // annualized attrition rate (terms over a 12mo window ÷ average headcount over that
+  // same window), same 24mo-for-12-points reasoning as terminationsTrend above.
+  headcountMonthlyTrend: `
     SELECT MONTH_END_DT, COUNT(DISTINCT EMPLOYEE_ID) AS HC
     FROM PROD.PEOPLE.HEADCOUNT
     WHERE TYPE = 'employee' AND HEAD_CNT = 1 AND SNAP_DT = MONTH_END_DT
-      AND MONTH_END_DT >= DATEADD(month, -12, DATE_TRUNC('month', CURRENT_DATE()))
+      AND MONTH_END_DT >= DATEADD(month, -24, DATE_TRUNC('month', CURRENT_DATE()))
       AND MONTH_END_DT < DATE_TRUNC('month', CURRENT_DATE())
     GROUP BY 1 ORDER BY 1`,
 };
@@ -1605,6 +1607,21 @@ function trailing12MonthKeys() {
   return keys;
 }
 
+// The 12 month keys ending at (and including) `key` — e.g. monthKeysEndingAt('2026-07',12)
+// covers 2025-08 through 2026-07. Used to compute a rolling trailing-12mo rate as of
+// each of the last 12 month-ends, which is why terminationsTrend/headcountMonthlyTrend
+// pull 24 months of raw data instead of just 12.
+function monthKeysEndingAt(key, n) {
+  const [y, m] = key.split('-').map(Number);
+  const keys = [];
+  for (let i = n - 1; i >= 0; i--) {
+    let mm = m - 1 - i, yy = y;
+    while (mm < 0) { mm += 12; yy -= 1; }
+    keys.push(`${yy}-${String(mm + 1).padStart(2, '0')}`);
+  }
+  return keys;
+}
+
 function preProcessAttrition(termRows, hcRows) {
   const months = trailing12MonthKeys();
   const volByMonth = {}, involByMonth = {};
@@ -1616,12 +1633,29 @@ function preProcessAttrition(termRows, hcRows) {
   }
   const hcByMonth = {};
   for (const r of hcRows) hcByMonth[parseDate(r.MONTH_END_DT).slice(0, 7)] = +(r.HC || 0);
-  const hcVals = months.map(m => hcByMonth[m]).filter(v => v != null);
-  const avgHc = hcVals.length ? hcVals.reduce((s, v) => s + v, 0) / hcVals.length : null;
+
+  // Rolling trailing-12mo annualized rate as of each of the last 12 month-ends —
+  // the trend line. Each point independently sums its own 12mo window (reaching as
+  // far back as 23 months ago for the earliest point) rather than reusing `months`.
+  const trend = months.map(asOf => {
+    const window = monthKeysEndingAt(asOf, 12);
+    const vol = window.reduce((s, m) => s + (volByMonth[m] || 0), 0);
+    const invol = window.reduce((s, m) => s + (involByMonth[m] || 0), 0);
+    const hcVals = window.map(m => hcByMonth[m]).filter(v => v != null);
+    const avgHc = hcVals.length ? hcVals.reduce((s, v) => s + v, 0) / hcVals.length : null;
+    return {
+      asOf, avgHc,
+      volRate: avgHc ? vol / avgHc : null,
+      involRate: avgHc ? invol / avgHc : null,
+      totalRate: avgHc ? (vol + invol) / avgHc : null,
+    };
+  });
+
+  const avgHc = trend[trend.length - 1]?.avgHc ?? null;
   const totalVol = months.reduce((s, m) => s + (volByMonth[m] || 0), 0);
   const totalInvol = months.reduce((s, m) => s + (involByMonth[m] || 0), 0);
   return {
-    months, volByMonth, involByMonth, avgHc,
+    months, volByMonth, involByMonth, avgHc, trend,
     volRate: avgHc ? totalVol / avgHc : null,
     involRate: avgHc ? totalInvol / avgHc : null,
     totalRate: avgHc ? (totalVol + totalInvol) / avgHc : null,
@@ -1632,6 +1666,37 @@ function preProcessAttrition(termRows, hcRows) {
 function monthLabel(key) {
   const [y, m] = key.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+}
+
+function makeAttritionTrendChart(trend) {
+  const canvasId = 'chart-attritionTrend';
+  destroyArrChart(canvasId);
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  const pctFmt = v => v == null ? '—' : (v * 100).toFixed(1) + '%';
+  arrChartInstances[canvasId] = new Chart(el, {
+    type: 'line',
+    data: {
+      labels: trend.map(t => monthLabel(t.asOf)),
+      datasets: [
+        { label: 'Voluntary', data: trend.map(t => t.volRate), borderColor: BRAND.teal, backgroundColor: BRAND.teal, tension: 0.25, spanGaps: true },
+        { label: 'Involuntary', data: trend.map(t => t.involRate), borderColor: BRAND.bad, backgroundColor: BRAND.bad, tension: 0.25, spanGaps: true },
+        { label: 'Total', data: trend.map(t => t.totalRate), borderColor: BRAND.black, backgroundColor: BRAND.black, borderDash: [4, 3], tension: 0.25, spanGaps: true },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        title: { display: true, text: 'Rolling trailing-12mo annualized attrition rate', align: 'start', color: '#0C0C0C', font: { size: 12, weight: '700' }, padding: { bottom: 10 } },
+        legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${pctFmt(c.raw)}` } },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, callback: v => (v * 100).toFixed(0) + '%' } },
+      },
+    },
+  });
 }
 
 function buildAttritionSection(a) {
@@ -1652,6 +1717,7 @@ function buildAttritionSection(a) {
         </tbody>
       </table>
     </div>
+    <div class="chart-card" style="height:320px; margin-top:14px;"><canvas id="chart-attritionTrend"></canvas></div>
     <div class="cards-row" style="margin-top:14px;">
       <div class="stat-card">
         <div class="sc-label">Annualized voluntary attrition</div>
@@ -1684,6 +1750,7 @@ function buildHeadcountTab(deptRows, eventRows, termRows, hcRows) {
     ${buildAttritionSection(attr)}
   `;
   document.getElementById('headcountContent').innerHTML = html;
+  makeAttritionTrendChart(attr.trend);
 }
 
 function tagHtml(type) {
@@ -2113,7 +2180,7 @@ function showTab(name){
   // Chart.js charts built while their tab-pane was display:none (i.e. every tab except
   // the default one, at page-load time) size themselves against a 0×0 container and
   // render blank. Force a resize/redraw the moment the ARR tab actually becomes visible.
-  if (name === 'arr') {
+  if (name === 'arr' || name === 'headcount') {
     Object.values(arrChartInstances).forEach(ch => { ch.resize(); ch.update(); });
   }
 }
@@ -2137,7 +2204,7 @@ async function loadAll() {
       execSQL(Q.pipeline), execSQL(Q.closedFYTD), execSQL(Q.salesTargets), execSQL(Q.customerHealth), execSQL(Q.rvpSelfOwnedDeals),
       execSQL(Q.consumptionCapacity), execSQL(Q.consumptionRateInputs), execSQL(Q.consumptionWeeklyUsage),
       execSQL(Q.arrActuals), execSQL(Q.arrPlan), execSQL(Q.arrLogoEvents), execSQL(Q.renewalDeals), execSQL(Q.employeeTenure),
-      execSQL(Q.headcountByDept), execSQL(Q.employeeFutureEvents), execSQL(Q.terminations12mo), execSQL(Q.headcountMonthly12mo)
+      execSQL(Q.headcountByDept), execSQL(Q.employeeFutureEvents), execSQL(Q.terminationsTrend), execSQL(Q.headcountMonthlyTrend)
     ]);
     msg.textContent = 'Building dashboard…';
     const deals = preProcessPipeline(pipeRows);
