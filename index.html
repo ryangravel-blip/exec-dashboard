@@ -1293,16 +1293,16 @@ function preProcessRenewals(rows) {
   return [1, 2, 3, 4].map(q => {
     const deals = byQtr[q].slice().sort((a, b) => a.closeDt.localeCompare(b.closeDt));
     const upForRenewal = deals.reduce((s, d) => s + d.upForRenewal, 0);
-    const churned = deals.filter(d => d.outcome === 'Churn').reduce((s, d) => s + d.upForRenewal, 0);
+    const churnArr = deals.filter(d => d.outcome === 'Churn').reduce((s, d) => s + d.upForRenewal, 0);
     // Downgrade shortfall: the ARR given up on deals that renewed at a reduced amount
-    // (up-for-renewal minus what they actually renewed at) — not counted in "Churned"
-    // above (that's Churn-outcome deals only), shown as its own line since it's ARR
-    // lost from the book even though the customer didn't fully churn.
+    // (up-for-renewal minus what they actually renewed at) — folded into "Churned"
+    // as total ARR lost from the book, whether from full churn or a downgrade.
     const downgradeShortfall = deals.filter(d => d.outcome === 'Downgrade' && d.expectedArr != null)
       .reduce((s, d) => s + (d.upForRenewal - d.expectedArr), 0);
+    const churned = churnArr + downgradeShortfall;
     const renewed = deals.reduce((s, d) => s + (d.expectedArr != null ? d.expectedArr : 0), 0);
     const grr = upForRenewal > 0 ? renewed / upForRenewal : null;
-    return { q, deals, upForRenewal, churned, downgradeShortfall, renewed, grr };
+    return { q, deals, upForRenewal, churned, renewed, grr };
   });
 }
 
@@ -1314,7 +1314,7 @@ function outcomeBadge(outcome) {
 }
 
 function buildRenewalsTab(quarters) {
-  const html = quarters.map(({ q, deals, upForRenewal, churned, downgradeShortfall, renewed, grr }) => {
+  const html = quarters.map(({ q, deals, upForRenewal, churned, renewed, grr }) => {
     const rows = deals.map(d => `
       <tr>
         <td title="${d.name}">${d.name}</td>
@@ -1338,7 +1338,6 @@ function buildRenewalsTab(quarters) {
           <div class="stat-card warn">
             <div class="sc-label">Churned</div>
             <div class="sc-value">${K(churned)}</div>
-            <div class="sc-sub">+ ${K(downgradeShortfall)} lost to downgrades</div>
           </div>
           <div class="stat-card">
             <div class="sc-label">Gross retention</div>
