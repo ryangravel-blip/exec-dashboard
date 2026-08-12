@@ -778,10 +778,14 @@ const Q = {
   // broad parent bucket (Sales, Engineering, G&A, ...) and DIVISION holds the specific
   // team underneath it (Sales - Enterprise, SW Engineering, ...). Mapped correctly to
   // "parent department" / "department" in the UI despite the column names.
+  // IS_HEADCOUNT=TRUE already excludes interns in practice (confirmed: no "Intern"
+  // EMPLOYEE_TYPE shows up here), but JOB_TITLE NOT ILIKE '%intern%' is added as a
+  // defensive belt-and-suspenders filter per Ryan's request to exclude interns from
+  // every headcount figure, current data quality notwithstanding.
   headcountByDept: `
     SELECT DEPARTMENT AS PARENT_DEPT, DIVISION AS DEPT, COUNT(*) AS HEADCOUNT
     FROM PROD.PEOPLE.CURRENT_EMPLOYEES
-    WHERE IS_HEADCOUNT = TRUE
+    WHERE IS_HEADCOUNT = TRUE AND JOB_TITLE NOT ILIKE '%intern%'
     GROUP BY 1, 2
     ORDER BY 1, 2`,
 
@@ -789,7 +793,9 @@ const Q = {
   // current headcount — drives the "adjusted headcount" columns and the named
   // upcoming-hires/upcoming-terms lists. Transfers use LAG() to find the employee's
   // prior (source) department, since EMPLOYEE_EVENTS only stores the destination
-  // department directly on the reorg event row.
+  // department directly on the reorg event row. IS_INTERN excluded per Ryan's request —
+  // unlike CURRENT_EMPLOYEES, EMPLOYEE_EVENTS has no IS_HEADCOUNT-equivalent gate on
+  // these date filters, so a future intern start/end could otherwise leak in.
   employeeFutureEvents: `
     WITH ordered AS (
       SELECT EMPLOYEE_ID, FULL_NAME, VALID_FROM_DT, DEPARTMENT, DIVISION, START_DT, DEPARTURE_DT,
@@ -797,6 +803,7 @@ const Q = {
              LAG(DEPARTMENT) OVER (PARTITION BY EMPLOYEE_ID ORDER BY VALID_FROM_DT) AS PREV_DEPARTMENT,
              LAG(DIVISION) OVER (PARTITION BY EMPLOYEE_ID ORDER BY VALID_FROM_DT) AS PREV_DIVISION
       FROM PROD.PEOPLE.EMPLOYEE_EVENTS
+      WHERE COALESCE(IS_INTERN, FALSE) = FALSE
     )
     SELECT 'hire' AS EVENT_TYPE, FULL_NAME, DEPARTMENT, DIVISION, NULL AS PREV_DEPARTMENT, NULL AS PREV_DIVISION, START_DT AS EVENT_DT
     FROM ordered WHERE IS_START_EVENT = TRUE AND START_DT > CURRENT_DATE()
@@ -811,23 +818,27 @@ const Q = {
   // Trailing 24 complete months (excludes the current in-progress month) of voluntary
   // and involuntary terminations. Pulls 24mo, not just 12, so the trend chart can plot
   // a rolling trailing-12-month annualized rate at each of the last 12 month-ends —
-  // the earliest of those 12 points still needs the 12 months before it.
+  // the earliest of those 12 points still needs the 12 months before it. No intern
+  // terminations found in this window today, but JOB_TITLE filter added defensively.
   terminationsTrend: `
     SELECT DATE_TRUNC('month', DEPARTURE_DT) AS MTH, TERMINATED_REASON, COUNT(*) AS CNT
     FROM PROD.PEOPLE.EMPLOYEES
     WHERE DEPARTURE_DT >= DATEADD(month, -24, DATE_TRUNC('month', CURRENT_DATE()))
       AND DEPARTURE_DT < DATE_TRUNC('month', CURRENT_DATE())
       AND TERMINATED_REASON IN ('Voluntary', 'Involuntary')
+      AND JOB_TITLE NOT ILIKE '%intern%'
     GROUP BY 1, 2
     ORDER BY 1, 2`,
 
   // Trailing 24 complete months of month-end headcount — denominator for the rolling
   // annualized attrition rate (terms over a 12mo window ÷ average headcount over that
   // same window), same 24mo-for-12-points reasoning as terminationsTrend above.
+  // HEAD_CNT=1 already excludes interns in practice; JOB_TITLE filter added defensively.
   headcountMonthlyTrend: `
     SELECT MONTH_END_DT, COUNT(DISTINCT EMPLOYEE_ID) AS HC
     FROM PROD.PEOPLE.HEADCOUNT
     WHERE TYPE = 'employee' AND HEAD_CNT = 1 AND SNAP_DT = MONTH_END_DT
+      AND JOB_TITLE NOT ILIKE '%intern%'
       AND MONTH_END_DT >= DATEADD(month, -24, DATE_TRUNC('month', CURRENT_DATE()))
       AND MONTH_END_DT < DATE_TRUNC('month', CURRENT_DATE())
     GROUP BY 1 ORDER BY 1`,
