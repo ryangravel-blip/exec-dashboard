@@ -240,9 +240,9 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
   <div class="custarr-summary">
     <div class="custarr-stat"><div class="cs-label">Total Customers</div><div class="cs-value" id="ch-total">—</div><div class="cs-sub">active ARR</div></div>
     <div class="custarr-stat"><div class="cs-label">Total ARR</div><div class="cs-value" id="ch-arr">—</div><div class="cs-sub">current</div></div>
-    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-red"></span>Red</div><div class="cs-value" id="ch-red">—</div><div class="cs-sub">health_color</div></div>
-    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-yellow"></span>Yellow</div><div class="cs-value" id="ch-yellow">—</div><div class="cs-sub">health_color</div></div>
-    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-green"></span>Green</div><div class="cs-value" id="ch-green">—</div><div class="cs-sub">health_color</div></div>
+    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-red"></span>Red</div><div class="cs-value" id="ch-red">—</div><div class="cs-sub" id="ch-red-arr">—</div></div>
+    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-yellow"></span>Yellow</div><div class="cs-value" id="ch-yellow">—</div><div class="cs-sub" id="ch-yellow-arr">—</div></div>
+    <div class="custarr-stat"><div class="cs-label"><span class="health-dot health-green"></span>Green</div><div class="cs-value" id="ch-green">—</div><div class="cs-sub" id="ch-green-arr">—</div></div>
   </div>
 
   <div class="section-title">Customer health — weekly summary <span class="hint">Auto-generated Monday mornings · health_color changes and score movers, week over week</span></div>
@@ -1601,9 +1601,14 @@ function buildHealthCards(rows){
   const totalARR = rows.reduce((s,r)=>s+r.arr,0);
   document.getElementById('ch-total').textContent = rows.length;
   document.getElementById('ch-arr').textContent = '$' + N(Math.round(totalARR/1e6),1) + 'M';
-  document.getElementById('ch-red').textContent = rows.filter(r=>r.healthColor==='red').length;
-  document.getElementById('ch-yellow').textContent = rows.filter(r=>r.healthColor==='yellow').length;
-  document.getElementById('ch-green').textContent = rows.filter(r=>r.healthColor==='green').length;
+  const byColor = color => rows.filter(r=>r.healthColor===color);
+  const arrOf = color => byColor(color).reduce((s,r)=>s+r.arr,0);
+  document.getElementById('ch-red').textContent = byColor('red').length;
+  document.getElementById('ch-red-arr').textContent = K(arrOf('red')) + ' ARR';
+  document.getElementById('ch-yellow').textContent = byColor('yellow').length;
+  document.getElementById('ch-yellow-arr').textContent = K(arrOf('yellow')) + ' ARR';
+  document.getElementById('ch-green').textContent = byColor('green').length;
+  document.getElementById('ch-green-arr').textContent = K(arrOf('green')) + ' ARR';
 }
 
 function filterHealthTable(){
