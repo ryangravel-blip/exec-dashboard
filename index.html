@@ -725,6 +725,17 @@ const Q = {
     FROM PROD.SALESFORCE.OPPORTUNITIES
     WHERE FISCAL_YR = ${parseInt(CURRENT_FY_PREFIX)}
       AND ARR_UP_FOR_RENEWAL IS NOT NULL AND ARR_UP_FOR_RENEWAL != 0
+      -- Excludes stale/superseded renewal opportunities from 30-day (or longer) extensions
+      -- Ryan confirmed with the deal desk — the account renegotiated a new close date and
+      -- the earlier opportunity record was left behind rather than closed out:
+      --   Sporting Life Group Limited: 3/4/26 record superseded by the 4/9/26 renewal
+      --   Under Armour: 3/11/26 "Full" record superseded by the 4/30/26 "Churn" outcome
+      --   GoTo Foods LLC: 4/23/26 (Q1) record superseded by an extension into Q3 (10/30/26)
+      AND OPPORTUNITY_ID NOT IN (
+        '006Ql00000aXIcXIAW', -- Sporting Life Group Limited, 3/4/26 (kept: 4/9/26)
+        '006Ql00000avnIcIAI', -- Under Armour, 3/11/26 Full (kept: 4/30/26 Churn)
+        '006Ql00000Bs21hIAB'  -- GoTo Foods LLC, Q1 4/23/26 (kept: Q3 10/30/26)
+      )
     ORDER BY FISCAL_QTR, CLOSE_DT`,
 };
 
