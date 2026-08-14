@@ -324,6 +324,20 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
 
   <div class="pace-cards-row" id="consumptionCardsRow"></div>
 
+  <div class="table-card health-legend">
+    <div class="hl-col">
+      <div class="hl-title">How pacing multiple is calculated</div>
+      <div class="hl-row"><span class="hl-def">Multiple = % of ARR/TCV consumed ÷ % of contract time elapsed. A multiple of 1.0 means a customer is consuming exactly on pace with how much of their contract term has passed.</span></div>
+    </div>
+    <div class="hl-col">
+      <div class="hl-title">Health category thresholds</div>
+      <div class="hl-row"><span class="pace-badge pace-cat-over">Overpacing</span><span class="hl-def">Multiple &gt; 1.15 (consuming &gt;115% of time pace)</span></div>
+      <div class="hl-row"><span class="pace-badge pace-cat-ontrack">On track</span><span class="hl-def">Multiple between 0.85 and 1.15</span></div>
+      <div class="hl-row"><span class="pace-badge pace-cat-under">Underpacing</span><span class="hl-def">Multiple between 0.50 and 0.85</span></div>
+      <div class="hl-row"><span class="pace-badge pace-cat-sigunder">Significantly underpacing</span><span class="hl-def">Multiple below 0.50</span></div>
+    </div>
+  </div>
+
   <div class="section-title">Consumption health <span class="hint">Capacity/TCV vs. burn from PROD.DEALSBASE.CONSUMPTION_BUDGET &amp; CONS_DEAL_PRODUCTS · % consumed and time elapsed drive the pacing multiple · 4-wk pace/trend derived from PROD.FISHBOWL.AMPS usage at each account's own $/usage rate</span></div>
   <div class="custarr-controls">
     <input type="text" id="conSearch" placeholder="Search customers…" oninput="filterConsumptionTable()">
@@ -1361,11 +1375,12 @@ function buildArrCharts(pp) {
   makeArrBarChart('chart-newExpArr', 'New & Expansion ARR', actualOrNull(q=>q.newArr+q.expArr), planSeries(p=>p.newArr+p.expArr), K);
   makeArrBarChart('chart-churnArr', 'Downsell/Churn ARR', actualOrNull(q=>q.churnArr), planSeries(p=>p.churnArr), K);
   // Churned logos: actual comes back as a positive count from the source query — negate
-  // it so it renders on the same (negative) side as Plan. Up for renewal: actual comes
-  // back negative from customer_month — negate it to match Plan's positive convention.
+  // it so it renders on the same (negative) side as Plan. Up for renewal: actual now
+  // comes from the Salesforce-based renewals source (see preProcessArrPerformance),
+  // which is already positive like Plan — no sign flip needed.
   makeArrBarChart('chart-newLogos', 'New logos (#)', actualOrNull(q=>q.newLogos), planSeries(p=>p.newLogos), N);
   makeArrBarChart('chart-churnedLogos', 'Churned logos (#)', actualOrNull(q=>-q.churnedLogos), planSeries(p=>p.churnedLogos), N);
-  makeArrBarChart('chart-upForRenewal', 'Up for renewal ARR', actualOrNull(q=>-q.upForRenewal), planSeries(p=>p.upForRenewal), K);
+  makeArrBarChart('chart-upForRenewal', 'Up for renewal ARR', actualOrNull(q=>q.upForRenewal), planSeries(p=>p.upForRenewal), K);
   makeNetNewArrYtdChart(pp);
   makeArrEopChart(pp);
 }
