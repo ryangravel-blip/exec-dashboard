@@ -1,5 +1,5 @@
 {
- "snapshot_date": "2026-08-13",
+ "snapshot_date": "2026-08-14",
  "columns": [
   "customer_id",
   "customer_name",
@@ -9,6 +9,97 @@
  ],
  "customers": [
   [
+   "641",
+   "Johnnie-O",
+   "001f400001KvB2BAAV",
+   62.83611111111111,
+   "yellow"
+  ],
+  [
+   "52054",
+   "Football Northwest LLC dba Seattle Seahawks",
+   "001f400001Kv9PtAAJ",
+   74.39805555555556,
+   "green"
+  ],
+  [
+   "14",
+   "The Gap, Inc.",
+   "001f4000002YGmEAAW",
+   68.43,
+   "green"
+  ],
+  [
+   "35338",
+   "General Motors LLC",
+   "001Ql000008b0J0IAI",
+   42.65555555555555,
+   "red"
+  ],
+  [
+   "6",
+   "Alaska Airlines",
+   "001f4000002YGhHAAW",
+   73.39954545454546,
+   "green"
+  ],
+  [
+   "85023",
+   "Preferred Travel Group",
+   "001Ql00000rqjk6IAA",
+   50.80897435897435,
+   "yellow"
+  ],
+  [
+   "83191",
+   "PetSmart",
+   "001f4000002YGm9AAG",
+   60.46396825396825,
+   "red"
+  ],
+  [
+   "64463",
+   "Cracker Barrel Old Country Store, Inc.",
+   "001f400000u5hrpAAA",
+   67.8535,
+   "green"
+  ],
+  [
+   "87143",
+   "Sharecare Operating Company, Inc.",
+   "001Ql00000Yr9wCIAR",
+   48.565,
+   "yellow"
+  ],
+  [
+   "69701",
+   "World Travel Holdings (WTH)",
+   "0015G00001xDwNGQA0",
+   69.53750000000001,
+   "green"
+  ],
+  [
+   "66878",
+   "Dubai Aviation Corporation",
+   "0015G00002fIvKZQA0",
+   58.1505,
+   "yellow"
+  ],
+  [
+   "37",
+   "WHR Operations, LLC",
+   "001f400000Bc9eQAAR",
+   64.78103535353536,
+   "yellow"
+  ],
+  [
+   "4159",
+   "Home Depot Store Support, Inc.",
+   "001f400001KvBRYAA3",
+   74.7973015873016,
+   "green"
+  ],
+  [
    "15340",
    "Smithsonian",
    "001f40000110mFtAAI",
@@ -16,60 +107,39 @@
    "green"
   ],
   [
-   "69097",
-   "Intrepid Travel Pty Ltd",
-   "0015G000027ZDwLQAW",
-   61.113715277777786,
+   "2630",
+   "Deckers Outdoor Corporation",
+   "001f400001KvBdEAAV",
+   73.69833333333334,
+   "green"
+  ],
+  [
+   "46098",
+   "TUI InfoTec GmbH",
+   "0015G000029PoOAQA0",
+   33.485,
    "red"
   ],
   [
-   "20736",
-   "Saks.com LLC",
-   "0015G00001fScoHQAS",
-   60.71777777777778,
+   "38730",
+   "Accent Group Ltd",
+   "0015G000027ZE95QAG",
+   50.00694444444445,
    "yellow"
   ],
   [
-   "32344",
-   "Rhone Apparel, Inc.",
-   "001f400001KvAijAAF",
-   75.003,
-   "green"
-  ],
-  [
-   "646",
-   "Laura's Shoppe (P.V.) Inc.",
-   "001f400001KvBiKAAV",
-   52.12166666666667,
+   "8555",
+   "SPARC Group LLC",
+   "001f400001Kv9g8AAB",
+   48.846785714285716,
    "red"
   ],
   [
-   "76941",
-   "Orion Advisor Solutions, Inc.",
-   "001Ql00000ir4loIAA",
-   65.82107142857143,
+   "35",
+   "Williams Sonoma Inc.",
+   "001f400000AYr4FAAT",
+   78.50677777777778,
    "green"
-  ],
-  [
-   "618",
-   "Bonobos, Inc.",
-   "001f400001KvBNRAA3",
-   71.29833333333333,
-   "green"
-  ],
-  [
-   "16488",
-   "Rogers Communications Canada, Inc",
-   "0015G00001WM9GCQA1",
-   72.25777777777779,
-   "green"
-  ],
-  [
-   "80571",
-   "St. George's University",
-   "001Ql00000fe3xFIAQ",
-   48.961000000000006,
-   "yellow"
   ],
   [
    "24377",
@@ -79,25 +149,32 @@
    "red"
   ],
   [
-   "26308",
-   "MillerKnoll, Inc.",
-   "0015G00001pfeahQAA",
-   67.655,
+   "663",
+   "The Body Shop",
+   "001f400001KvBPaAAN",
+   62.57958333333333,
+   "yellow"
+  ],
+  [
+   "4159",
+   "Home Depot Store Support, Inc.",
+   "0015G000022mraYQAQ",
+   71.21027777777778,
    "green"
   ],
   [
-   "15753",
-   "Citizen Watch Company of America",
-   "001f400001KvBW5AAN",
-   46.01083333333334,
-   "red"
+   "657",
+   "Shiseido Americas Corporation",
+   "0015G00001VpthfQAB",
+   75.774,
+   "green"
   ],
   [
-   "38322",
-   "Loblaws Inc.",
-   "001f400001KvBSLAA3",
-   73.822,
-   "green"
+   "78558",
+   "The Boca Raton",
+   "001Ql00000iUX8ZIAW",
+   55.29871428571429,
+   "yellow"
   ],
   [
    "36",
@@ -114,34 +191,6 @@
    "red"
   ],
   [
-   "79767",
-   "Andmore, LLC",
-   "001Ql00000kw1nfIAA",
-   48.16711111111111,
-   "yellow"
-  ],
-  [
-   "23",
-   "MGM Resorts International",
-   "001f4000002YGiXAAW",
-   74.67222222222222,
-   "green"
-  ],
-  [
-   "52158",
-   "CubeSmart, L.P.",
-   "0015G00002UKIF6QAP",
-   75.95305555555557,
-   "green"
-  ],
-  [
-   "66878",
-   "Dubai Aviation Corporation",
-   "0015G00002fIvKZQA0",
-   58.1505,
-   "yellow"
-  ],
-  [
    "50845",
    "Manufacturers and Traders Trust Company (M&T)",
    "001f400000Bc9eFAAR",
@@ -149,346 +198,10 @@
    "green"
   ],
   [
-   "38000",
-   "Bowtie Hospitality, LLC",
-   "0015G00002UNRnSQAX",
-   67.9648611111111,
-   "green"
-  ],
-  [
-   "78558",
-   "The Boca Raton",
-   "001Ql00000iUX8ZIAW",
-   55.29871428571429,
-   "yellow"
-  ],
-  [
-   "23553",
-   "Alice + Olivia LLC",
-   "001f400001GZucDAAT",
-   53.884166666666665,
-   "red"
-  ],
-  [
-   "32567",
-   "Caleres, Inc.",
-   "001f400000Bc9cMAAR",
-   70.76444444444445,
-   "green"
-  ],
-  [
-   "87247",
-   "Domino's Pizza",
-   "001f400000HgeuyAAB",
-   47.0585,
-   "yellow"
-  ],
-  [
-   "34931",
-   "JD Group",
-   "0015G000026M5ROQA0",
-   65.24000000000001,
-   "green"
-  ],
-  [
-   "86943",
-   "Kerzner International Management FZE",
-   "001f400000CEHbcAAH",
-   47.30464285714285,
-   "yellow"
-  ],
-  [
-   "31",
-   "Servco Pacific Inc.",
-   "001f400000hYDMHAA4",
-   77.685,
-   "green"
-  ],
-  [
-   "71306",
-   "Signet Group Services US, Inc.",
-   "001f400000DRkcBAAT",
-   65.76,
-   "green"
-  ],
-  [
-   "27",
-   "Nordstrom, Inc.",
-   "001f4000002YGhBAAW",
-   66.18944444444445,
-   "green"
-  ],
-  [
-   "64969",
-   "Emirates Group",
-   "001f4000002YGhVAAW",
-   49.065694444444446,
-   "red"
-  ],
-  [
-   "48122",
-   "Prog Leasing, LLC",
-   "0015G00002YyTNUQA3",
-   73.73569444444445,
-   "green"
-  ],
-  [
-   "663",
-   "The Body Shop",
-   "001f400001KvBPaAAN",
-   62.57958333333333,
-   "yellow"
-  ],
-  [
-   "50643",
-   "Fleet Farm Group LLC",
-   "001Ql000000gbPnIAI",
-   75.32427777777778,
-   "green"
-  ],
-  [
-   "77543",
-   "Worldwide Golf Shops LLC",
-   "001f400001KvAKuAAN",
-   46.735625,
-   "red"
-  ],
-  [
-   "82083",
-   "Scandinavian Airlines",
-   "001Ql00000nWJg1IAG",
-   49.30869047619048,
-   "red"
-  ],
-  [
-   "35338",
-   "General Motors LLC",
-   "001Ql000008b0J0IAI",
-   42.65555555555555,
-   "red"
-  ],
-  [
-   "80672",
-   "B&Q Limited",
-   "0015G00001V7la1QAB",
-   40.48916666666666,
-   "red"
-  ],
-  [
-   "30",
-   "Seattle Soccer LLC, dba Seattle Sounders FC",
-   "001f400000AYG3CAAX",
-   80.90944444444445,
-   "green"
-  ],
-  [
-   "57112",
-   "L. L. Bean, Inc.",
-   "001f4000002YGgxAAG",
-   68.34123015873017,
-   "green"
-  ],
-  [
-   "60450",
-   "Asset Marketing Services LLC",
-   "001f400001Kv9f8AAB",
-   48.786666666666676,
-   "red"
-  ],
-  [
-   "27560",
-   "Authentic Brands Group LLC",
-   "0015G00001fSw1CQAS",
-   72.29736111111112,
-   "green"
-  ],
-  [
-   "16799",
-   "Virgin Cruises Intermediate Limited",
-   "001f400000FJLBiAAP",
-   54.674375,
-   "yellow"
-  ],
-  [
-   "15026",
-   "AirStream",
-   "001f400001UQ55bAAD",
-   53.44746031746032,
-   "yellow"
-  ],
-  [
-   "65373",
-   "Rural King Supply",
-   "001f400001IQhb0AAD",
-   45.95571428571428,
-   "red"
-  ],
-  [
-   "32786",
-   "Virgin Atlantic Airways Limited",
-   "0015G00001oma69QAA",
-   60.2781746031746,
-   "yellow"
-  ],
-  [
-   "637",
-   "Sporting Life Group (Golf Town Limited)",
-   "001f400001KvBi3AAF",
-   75.76055555555556,
-   "green"
-  ],
-  [
-   "36458",
-   "GoHealth, LLC",
-   "0015G00002KcHJPQA3",
-   74.697,
-   "green"
-  ],
-  [
-   "14",
-   "The Gap, Inc.",
-   "001f4000002YGmEAAW",
-   68.43,
-   "green"
-  ],
-  [
-   "35338",
-   "General Motors LLC",
-   "001Ql00000Ox1dPIAR",
-   42.65277777777778,
-   "red"
-  ],
-  [
-   "21884",
-   "Tumi, Inc.",
-   "001f400001KvBDsAAN",
-   55.6656746031746,
-   "red"
-  ],
-  [
-   "28279",
-   "EoS Fitness",
-   "0015G00001xDwktQAC",
-   55.68402777777778,
-   "yellow"
-  ],
-  [
-   "5072",
-   "First Hawaiian Bank",
-   "001f400001JU8VfAAL",
-   54.16777777777777,
-   "red"
-  ],
-  [
-   "55885",
-   "JB Hi-Fi Group Pty Ltd",
-   "0015G000027ZE5EQAW",
-   56.788611111111116,
-   "yellow"
-  ],
-  [
-   "22",
-   "Macy's, Inc.",
-   "001f400001KvBdcAAF",
-   61.10444444444445,
-   "yellow"
-  ],
-  [
-   "21678",
-   "Fossil Group",
-   "001f400000Bc9cXAAR",
-   52.610486111111115,
-   "red"
-  ],
-  [
-   "641",
-   "Johnnie-O",
-   "001f400001KvB2BAAV",
-   62.83611111111111,
-   "yellow"
-  ],
-  [
-   "55282",
-   "Books A Million",
-   "001f400001KvBEkAAN",
-   69.96645833333334,
-   "green"
-  ],
-  [
-   "87143",
-   "Sharecare Operating Company, Inc.",
-   "001Ql00000Yr9wCIAR",
-   48.565,
-   "yellow"
-  ],
-  [
-   "56607",
-   "American Honda Motor Co., Inc.",
-   "001f400000TGbupAAD",
-   65.30291666666668,
-   "green"
-  ],
-  [
-   "728",
-   "Dick's Sporting Goods",
-   "001f400000Bc9gPAAR",
-   72.35466666666667,
-   "green"
-  ],
-  [
-   "642",
-   "Johnny Was, LLC",
-   "001f400001KvBT7AAN",
-   67.21000000000001,
-   "green"
-  ],
-  [
-   "85023",
-   "Preferred Travel Group",
-   "001Ql00000rqjk6IAA",
-   50.80897435897435,
-   "yellow"
-  ],
-  [
-   "19",
-   "Kendra Scott, LLC",
-   "001f4000002Yv3NAAS",
-   67.62444444444445,
-   "green"
-  ],
-  [
-   "81479",
-   "Cell C",
-   "001Ql00000hrfDyIAI",
-   40.681000000000004,
-   "red"
-  ],
-  [
-   "85430",
-   "Floor and Decor Outlets of America, Inc.",
-   "001f400001D5Fn5AAF",
-   74.51875,
-   "green"
-  ],
-  [
-   "2630",
-   "Deckers Outdoor Corporation",
-   "001f400001KvBdEAAV",
-   73.69833333333334,
-   "green"
-  ],
-  [
-   "9",
-   "Brooks Sports, Inc.",
-   "001f4000004NrPdAAK",
-   73.81727272727272,
-   "green"
-  ],
-  [
-   "23019",
-   "The Vail Corporation",
-   "001f400000LrjyLAAR",
-   73.58222222222223,
+   "32344",
+   "Rhone Apparel, Inc.",
+   "001f400001KvAijAAF",
+   75.003,
    "green"
   ],
   [
@@ -499,171 +212,17 @@
    "red"
   ],
   [
-   "57113",
-   "Tilebar",
-   "001Ql00000Dl3SoIAJ",
-   53.12694444444445,
-   "yellow"
-  ],
-  [
-   "3140",
-   "Jackson Family Wines, Inc.",
-   "001f400001A4KKtAAN",
-   73.42699999999999,
-   "green"
-  ],
-  [
-   "83191",
-   "PetSmart",
-   "001f4000002YGm9AAG",
-   60.46396825396825,
+   "15753",
+   "Citizen Watch Company of America",
+   "001f400001KvBW5AAN",
+   46.01083333333334,
    "red"
-  ],
-  [
-   "4159",
-   "Home Depot Store Support, Inc.",
-   "001f4000002YGffAAG",
-   54.56064285714285,
-   "yellow"
-  ],
-  [
-   "59045",
-   "New Look Retailers Limited",
-   "001f400001KvBVGAA3",
-   72.62625,
-   "green"
-  ],
-  [
-   "32349",
-   "Paul Fredrick Menstyle, LLC",
-   "001f400001KvBL8AAN",
-   71.78960317460317,
-   "green"
-  ],
-  [
-   "675",
-   "Vince, LLC",
-   "001f400001KvBEdAAN",
-   74.28111111111112,
-   "green"
-  ],
-  [
-   "24070",
-   "Gerber Products Company",
-   "001Ql00000PZHQzIAP",
-   49.45678571428572,
-   "red"
-  ],
-  [
-   "39439",
-   "Haymarket Media Group Limited",
-   "0015G00002cm5jqQAA",
-   75.60666666666667,
-   "green"
-  ],
-  [
-   "38208",
-   "National Football League",
-   "001f400000rSZyZAAW",
-   66.16638888888889,
-   "green"
-  ],
-  [
-   "4159",
-   "Home Depot Store Support, Inc.",
-   "001f400001KvBRYAA3",
-   74.7973015873016,
-   "green"
-  ],
-  [
-   "20",
-   "KUIU, Inc.",
-   "001f400001KvBhEAAV",
-   74.92325396825397,
-   "green"
-  ],
-  [
-   "76942",
-   "Coastal Bank",
-   "001Ql00000VLawHIAT",
-   45.37483333333333,
-   "red"
-  ],
-  [
-   "35",
-   "Williams Sonoma Inc.",
-   "001f400000AYr4FAAT",
-   78.50677777777778,
-   "green"
-  ],
-  [
-   "65272",
-   "Coles Group Limited",
-   "001f400000G8fhwAAB",
-   67.80153846153846,
-   "green"
-  ],
-  [
-   "7",
-   "BECU",
-   "001f4000002YGi8AAG",
-   71.97111111111111,
-   "green"
-  ],
-  [
-   "55283",
-   "Funko, LLC",
-   "001f400001Kv9SiAAJ",
-   73.63458333333332,
-   "green"
-  ],
-  [
-   "6",
-   "Alaska Airlines",
-   "001f4000002YGhHAAW",
-   73.39954545454546,
-   "green"
-  ],
-  [
-   "39033",
-   "Michael Kors (USA), Inc.",
-   "001f4000002YGhdAAG",
-   60.62607638888889,
-   "yellow"
   ],
   [
    "65170",
    "Baltimore Ravens Limited Partnership",
    "001Ql00000TxDjhIAF",
    66.415,
-   "green"
-  ],
-  [
-   "190000",
-   "Stellantis N.V. North America",
-   "001Ql0000096RBdIAM",
-   42.0575,
-   "red"
-  ],
-  [
-   "52056",
-   "The Seattle Mariners",
-   "001f400000o1Wx9AAE",
-   54.7695,
-   "yellow"
-  ],
-  [
-   "31333",
-   "Oxford Industries, Inc.",
-   "001f400001KvAQRAA3",
-   77.11318181818183,
-   "green"
-  ],
-  [
-   "55279",
-   "Group1 Automotive",
-   "0015G00001VptZvQAJ",
-   71.16666666666667,
    "green"
   ],
   [
@@ -674,39 +233,130 @@
    "yellow"
   ],
   [
-   "75534",
-   "The Salvation Army",
-   "0015G00002bADvhQAG",
-   48.466875,
+   "38322",
+   "Loblaws Inc.",
+   "001f400001KvBSLAA3",
+   73.822,
+   "green"
+  ],
+  [
+   "77543",
+   "Worldwide Golf Shops LLC",
+   "001f400001KvAKuAAN",
+   46.735625,
    "red"
   ],
   [
-   "64463",
-   "Cracker Barrel Old Country Store, Inc.",
-   "001f400000u5hrpAAA",
-   67.8535,
+   "38000",
+   "Bowtie Hospitality, LLC",
+   "0015G00002UNRnSQAX",
+   67.9648611111111,
+   "green"
+  ],
+  [
+   "34931",
+   "JD Group",
+   "0015G000026M5ROQA0",
+   65.24000000000001,
+   "green"
+  ],
+  [
+   "21678",
+   "Fossil Group",
+   "001f400000Bc9cXAAR",
+   52.610486111111115,
+   "red"
+  ],
+  [
+   "85430",
+   "Floor and Decor Outlets of America, Inc.",
+   "001f400001D5Fn5AAF",
+   74.51875,
+   "green"
+  ],
+  [
+   "648",
+   "Mackenzie-Childs LLC",
+   "001f400001KvAJmAAN",
+   72.82727272727273,
+   "green"
+  ],
+  [
+   "81479",
+   "Cell C",
+   "001Ql00000hrfDyIAI",
+   40.681000000000004,
+   "red"
+  ],
+  [
+   "86238",
+   "Blain Supply Inc",
+   "001f400001Kv9NjAAJ",
+   59.188,
+   "yellow"
+  ],
+  [
+   "64969",
+   "Emirates Group",
+   "001f4000002YGhVAAW",
+   49.065694444444446,
+   "red"
+  ],
+  [
+   "50638",
+   "Choice Hotels International, Inc",
+   "001f400000GedyfAAB",
+   71.77959595959597,
+   "green"
+  ],
+  [
+   "642",
+   "Johnny Was, LLC",
+   "001f400001KvBT7AAN",
+   67.21000000000001,
+   "green"
+  ],
+  [
+   "637",
+   "Sporting Life Group (Golf Town Limited)",
+   "001f400001KvBi3AAF",
+   75.76055555555556,
    "green"
   ],
   [
    "4159",
    "Home Depot Store Support, Inc.",
-   "0015G000022mraYQAQ",
-   71.21027777777778,
-   "green"
-  ],
-  [
-   "678",
-   "World of Jeans and Tops dba Tillys",
-   "001f400001KvBFHAA3",
-   76.30749999999999,
-   "green"
-  ],
-  [
-   "37",
-   "WHR Operations, LLC",
-   "001f400000Bc9eQAAR",
-   64.78103535353536,
+   "001f4000002YGffAAG",
+   54.56064285714285,
    "yellow"
+  ],
+  [
+   "87247",
+   "Domino's Pizza",
+   "001f400000HgeuyAAB",
+   47.0585,
+   "yellow"
+  ],
+  [
+   "22",
+   "Macy's, Inc.",
+   "001f400001KvBdcAAF",
+   61.10444444444445,
+   "yellow"
+  ],
+  [
+   "27",
+   "Nordstrom, Inc.",
+   "001f4000002YGhBAAW",
+   66.18944444444445,
+   "green"
+  ],
+  [
+   "52158",
+   "CubeSmart, L.P.",
+   "0015G00002UKIF6QAP",
+   75.95305555555557,
+   "green"
   ],
   [
    "37899",
@@ -716,59 +366,94 @@
    "green"
   ],
   [
-   "69701",
-   "World Travel Holdings (WTH)",
-   "0015G00001xDwNGQA0",
-   69.53750000000001,
-   "green"
-  ],
-  [
-   "657",
-   "Shiseido Americas Corporation",
-   "0015G00001VpthfQAB",
-   75.774,
-   "green"
-  ],
-  [
-   "52054",
-   "Football Northwest LLC dba Seattle Seahawks",
-   "001f400001Kv9PtAAJ",
-   74.39805555555556,
-   "green"
-  ],
-  [
-   "38730",
-   "Accent Group Ltd",
-   "0015G000027ZE95QAG",
-   50.00694444444445,
-   "yellow"
-  ],
-  [
-   "43376",
-   "Airwair International Limited",
-   "0015G00002CCNfMQAX",
-   55.467839285714284,
-   "yellow"
-  ],
-  [
-   "60852",
-   "Hyatt Corporation",
-   "001f4000008m6ZfAAI",
-   64.2688888888889,
+   "5072",
+   "First Hawaiian Bank",
+   "001f400001JU8VfAAL",
+   54.16777777777777,
    "red"
   ],
   [
-   "652",
-   "Pacific Sunwear of California, Inc.",
-   "001f400001KvBNnAAN",
-   63.36464646464647,
+   "675",
+   "Vince, LLC",
+   "001f400001KvBEdAAN",
+   74.28111111111112,
+   "green"
+  ],
+  [
+   "15026",
+   "AirStream",
+   "001f400001UQ55bAAD",
+   53.44746031746032,
    "yellow"
   ],
   [
-   "50638",
-   "Choice Hotels International, Inc",
-   "001f400000GedyfAAB",
-   71.77959595959597,
+   "3140",
+   "Jackson Family Wines, Inc.",
+   "001f400001A4KKtAAN",
+   73.42699999999999,
+   "green"
+  ],
+  [
+   "16799",
+   "Virgin Cruises Intermediate Limited",
+   "001f400000FJLBiAAP",
+   54.674375,
+   "yellow"
+  ],
+  [
+   "190000",
+   "Stellantis N.V. North America",
+   "001Ql0000096RBdIAM",
+   42.0575,
+   "red"
+  ],
+  [
+   "16488",
+   "Rogers Communications Canada, Inc",
+   "0015G00001WM9GCQA1",
+   72.25777777777779,
+   "green"
+  ],
+  [
+   "31333",
+   "Oxford Industries, Inc.",
+   "001f400001KvAQRAA3",
+   77.11318181818183,
+   "green"
+  ],
+  [
+   "31",
+   "Servco Pacific Inc.",
+   "001f400000hYDMHAA4",
+   77.685,
+   "green"
+  ],
+  [
+   "20",
+   "KUIU, Inc.",
+   "001f400001KvBhEAAV",
+   74.92325396825397,
+   "green"
+  ],
+  [
+   "24070",
+   "Gerber Products Company",
+   "001Ql00000PZHQzIAP",
+   49.45678571428572,
+   "red"
+  ],
+  [
+   "55283",
+   "Funko, LLC",
+   "001f400001Kv9SiAAJ",
+   73.63458333333332,
+   "green"
+  ],
+  [
+   "65272",
+   "Coles Group Limited",
+   "001f400000G8fhwAAB",
+   67.80153846153846,
    "green"
   ],
   [
@@ -779,11 +464,137 @@
    "green"
   ],
   [
+   "43376",
+   "Airwair International Limited",
+   "0015G00002CCNfMQAX",
+   55.467839285714284,
+   "yellow"
+  ],
+  [
+   "38208",
+   "National Football League",
+   "001f400000rSZyZAAW",
+   66.16638888888889,
+   "green"
+  ],
+  [
+   "728",
+   "Dick's Sporting Goods",
+   "001f400000Bc9gPAAR",
+   72.35466666666667,
+   "green"
+  ],
+  [
+   "60450",
+   "Asset Marketing Services LLC",
+   "001f400001Kv9f8AAB",
+   48.786666666666676,
+   "red"
+  ],
+  [
+   "32786",
+   "Virgin Atlantic Airways Limited",
+   "0015G00001oma69QAA",
+   60.2781746031746,
+   "yellow"
+  ],
+  [
+   "27560",
+   "Authentic Brands Group LLC",
+   "0015G00001fSw1CQAS",
+   72.29736111111112,
+   "green"
+  ],
+  [
+   "86943",
+   "Kerzner International Management FZE",
+   "001f400000CEHbcAAH",
+   47.30464285714285,
+   "yellow"
+  ],
+  [
+   "52056",
+   "The Seattle Mariners",
+   "001f400000o1Wx9AAE",
+   54.7695,
+   "yellow"
+  ],
+  [
+   "69097",
+   "Intrepid Travel Pty Ltd",
+   "0015G000027ZDwLQAW",
+   61.113715277777786,
+   "red"
+  ],
+  [
+   "80571",
+   "St. George's University",
+   "001Ql00000fe3xFIAQ",
+   48.961000000000006,
+   "yellow"
+  ],
+  [
+   "48122",
+   "Prog Leasing, LLC",
+   "0015G00002YyTNUQA3",
+   73.73569444444445,
+   "green"
+  ],
+  [
    "22",
    "Macy's, Inc.",
    "001f4000002YGfbAAG",
    53.95666666666666,
    "yellow"
+  ],
+  [
+   "20736",
+   "Saks.com LLC",
+   "0015G00001fScoHQAS",
+   60.71777777777778,
+   "yellow"
+  ],
+  [
+   "59045",
+   "New Look Retailers Limited",
+   "001f400001KvBVGAA3",
+   72.62625,
+   "green"
+  ],
+  [
+   "71306",
+   "Signet Group Services US, Inc.",
+   "001f400000DRkcBAAT",
+   65.76,
+   "green"
+  ],
+  [
+   "19",
+   "Kendra Scott, LLC",
+   "001f4000002Yv3NAAS",
+   67.62444444444445,
+   "green"
+  ],
+  [
+   "60852",
+   "Hyatt Corporation",
+   "001f4000008m6ZfAAI",
+   64.2688888888889,
+   "red"
+  ],
+  [
+   "56607",
+   "American Honda Motor Co., Inc.",
+   "001f400000TGbupAAD",
+   65.30291666666668,
+   "green"
+  ],
+  [
+   "21884",
+   "Tumi, Inc.",
+   "001f400001KvBDsAAN",
+   55.6656746031746,
+   "red"
   ],
   [
    "653",
@@ -793,18 +604,74 @@
    "green"
   ],
   [
-   "86238",
-   "Blain Supply Inc",
-   "001f400001Kv9NjAAJ",
-   59.188,
+   "618",
+   "Bonobos, Inc.",
+   "001f400001KvBNRAA3",
+   71.29833333333333,
+   "green"
+  ],
+  [
+   "30",
+   "Seattle Soccer LLC, dba Seattle Sounders FC",
+   "001f400000AYG3CAAX",
+   80.90944444444445,
+   "green"
+  ],
+  [
+   "55282",
+   "Books A Million",
+   "001f400001KvBEkAAN",
+   69.96645833333334,
+   "green"
+  ],
+  [
+   "80672",
+   "B&Q Limited",
+   "0015G00001V7la1QAB",
+   40.48916666666666,
+   "red"
+  ],
+  [
+   "57113",
+   "Tilebar",
+   "001Ql00000Dl3SoIAJ",
+   53.12694444444445,
    "yellow"
   ],
   [
-   "648",
-   "Mackenzie-Childs LLC",
-   "001f400001KvAJmAAN",
-   72.82727272727273,
+   "36458",
+   "GoHealth, LLC",
+   "0015G00002KcHJPQA3",
+   74.697,
    "green"
+  ],
+  [
+   "76941",
+   "Orion Advisor Solutions, Inc.",
+   "001Ql00000ir4loIAA",
+   65.82107142857143,
+   "green"
+  ],
+  [
+   "646",
+   "Laura's Shoppe (P.V.) Inc.",
+   "001f400001KvBiKAAV",
+   52.12166666666667,
+   "red"
+  ],
+  [
+   "9",
+   "Brooks Sports, Inc.",
+   "001f4000004NrPdAAK",
+   73.81727272727272,
+   "green"
+  ],
+  [
+   "76942",
+   "Coastal Bank",
+   "001Ql00000VLawHIAT",
+   45.37483333333333,
+   "red"
   ],
   [
    "22089",
@@ -814,18 +681,151 @@
    "red"
   ],
   [
-   "46098",
-   "TUI InfoTec GmbH",
-   "0015G000029PoOAQA0",
-   33.485,
+   "39439",
+   "Haymarket Media Group Limited",
+   "0015G00002cm5jqQAA",
+   75.60666666666667,
+   "green"
+  ],
+  [
+   "39033",
+   "Michael Kors (USA), Inc.",
+   "001f4000002YGhdAAG",
+   60.62607638888889,
+   "yellow"
+  ],
+  [
+   "82083",
+   "Scandinavian Airlines",
+   "001Ql00000nWJg1IAG",
+   49.30869047619048,
    "red"
   ],
   [
-   "8555",
-   "SPARC Group LLC",
-   "001f400001Kv9g8AAB",
-   48.846785714285716,
+   "65373",
+   "Rural King Supply",
+   "001f400001IQhb0AAD",
+   45.95571428571428,
    "red"
+  ],
+  [
+   "23553",
+   "Alice + Olivia LLC",
+   "001f400001GZucDAAT",
+   53.884166666666665,
+   "red"
+  ],
+  [
+   "32349",
+   "Paul Fredrick Menstyle, LLC",
+   "001f400001KvBL8AAN",
+   71.78960317460317,
+   "green"
+  ],
+  [
+   "26308",
+   "MillerKnoll, Inc.",
+   "0015G00001pfeahQAA",
+   67.655,
+   "green"
+  ],
+  [
+   "57112",
+   "L. L. Bean, Inc.",
+   "001f4000002YGgxAAG",
+   68.34123015873017,
+   "green"
+  ],
+  [
+   "652",
+   "Pacific Sunwear of California, Inc.",
+   "001f400001KvBNnAAN",
+   63.36464646464647,
+   "yellow"
+  ],
+  [
+   "55885",
+   "JB Hi-Fi Group Pty Ltd",
+   "0015G000027ZE5EQAW",
+   56.788611111111116,
+   "yellow"
+  ],
+  [
+   "32567",
+   "Caleres, Inc.",
+   "001f400000Bc9cMAAR",
+   70.76444444444445,
+   "green"
+  ],
+  [
+   "55279",
+   "Group1 Automotive",
+   "0015G00001VptZvQAJ",
+   71.16666666666667,
+   "green"
+  ],
+  [
+   "678",
+   "World of Jeans and Tops dba Tillys",
+   "001f400001KvBFHAA3",
+   76.30749999999999,
+   "green"
+  ],
+  [
+   "35338",
+   "General Motors LLC",
+   "001Ql00000Ox1dPIAR",
+   42.65277777777778,
+   "red"
+  ],
+  [
+   "50643",
+   "Fleet Farm Group LLC",
+   "001Ql000000gbPnIAI",
+   75.32427777777778,
+   "green"
+  ],
+  [
+   "23",
+   "MGM Resorts International",
+   "001f4000002YGiXAAW",
+   74.67222222222222,
+   "green"
+  ],
+  [
+   "23019",
+   "The Vail Corporation",
+   "001f400000LrjyLAAR",
+   73.58222222222223,
+   "green"
+  ],
+  [
+   "79767",
+   "Andmore, LLC",
+   "001Ql00000kw1nfIAA",
+   48.16711111111111,
+   "yellow"
+  ],
+  [
+   "75534",
+   "The Salvation Army",
+   "0015G00002bADvhQAG",
+   48.466875,
+   "red"
+  ],
+  [
+   "7",
+   "BECU",
+   "001f4000002YGi8AAG",
+   71.97111111111111,
+   "green"
+  ],
+  [
+   "28279",
+   "EoS Fitness",
+   "0015G00001xDwktQAC",
+   55.68402777777778,
+   "yellow"
   ]
  ]
 }
