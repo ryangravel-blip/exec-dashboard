@@ -317,6 +317,13 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
 </div>
 
 <div class="tab-pane" id="tab-consumption">
+  <div class="section-title">Weekly consumption changes <span class="hint">Auto-generated Friday mornings, week over week</span></div>
+  <div class="table-card" id="consumptionSummaryCard" style="padding:16px 18px;">
+    <!-- CONSUMPTION_SUMMARY_START -->
+    <p>No prior snapshot available for comparison yet — this section will populate after the next weekly refresh.</p>
+    <!-- CONSUMPTION_SUMMARY_END -->
+  </div>
+
   <div class="metric-toggle" id="consumptionMetricToggle">
     <button class="metric-toggle-btn active" data-mode="arr" onclick="setConsumptionMetric('arr')">ARR</button>
     <button class="metric-toggle-btn" data-mode="tcv" onclick="setConsumptionMetric('tcv')">TCV (excl. one-time)</button>
@@ -356,6 +363,13 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
 </div>
 
 <div class="tab-pane" id="tab-arr">
+  <div class="section-title">Weekly ARR changes <span class="hint">Auto-generated Friday mornings, week over week</span></div>
+  <div class="table-card" id="arrSummaryCard" style="padding:16px 18px;">
+    <!-- ARR_SUMMARY_START -->
+    <p>No prior snapshot available for comparison yet — this section will populate after the next weekly refresh.</p>
+    <!-- ARR_SUMMARY_END -->
+  </div>
+
   <div id="arrCardsRow" class="cards-row"></div>
 
   <div class="section-title">New &amp; churned logos, FY27 YTD <span class="hint">Live from PROD.DEALSBASE.CUSTOMER_MONTH — updates automatically as deals close</span></div>
@@ -378,10 +392,24 @@ tbody tr.total-row td { border-top: 2px solid #0C0C0C; font-weight: 700; }
 </div>
 
 <div class="tab-pane" id="tab-renewals">
+  <div class="section-title">Weekly renewals changes <span class="hint">Auto-generated Friday mornings, week over week</span></div>
+  <div class="table-card" id="renewalsSummaryCard" style="padding:16px 18px;">
+    <!-- RENEWALS_SUMMARY_START -->
+    <p>No prior snapshot available for comparison yet — this section will populate after the next weekly refresh.</p>
+    <!-- RENEWALS_SUMMARY_END -->
+  </div>
+
   <div id="renewalsContent"></div>
 </div>
 
 <div class="tab-pane" id="tab-headcount">
+  <div class="section-title">Weekly headcount changes <span class="hint">Auto-generated Friday mornings, week over week</span></div>
+  <div class="table-card" id="headcountSummaryCard" style="padding:16px 18px;">
+    <!-- HEADCOUNT_SUMMARY_START -->
+    <p>No prior snapshot available for comparison yet — this section will populate after the next weekly refresh.</p>
+    <!-- HEADCOUNT_SUMMARY_END -->
+  </div>
+
   <div id="headcountContent"></div>
 </div>
 
