@@ -1122,7 +1122,7 @@ function monthToFQNum(dateStr) {
 // quarterly table are unaffected; they sum every row regardless).
 const LOGO_NOISE_FLOOR = 500;
 
-function preProcessArrPerformance(actualRows, planRows, logoRows) {
+function preProcessArrPerformance(actualRows, planRows, logoRows, renewalRows) {
   const emptyQtr = () => ({ newArr:0, expArr:0, churnArr:0, upForRenewal:0, renewed:0, newLogos:0, churnedLogos:0, eopArr:null, hasActual:false });
   const byQtr = { 1:emptyQtr(), 2:emptyQtr(), 3:emptyQtr(), 4:emptyQtr() };
   let latestMonth = null, latestEop = null;
@@ -1132,7 +1132,6 @@ function preProcessArrPerformance(actualRows, planRows, logoRows) {
     q.newArr += +(r.NEW_ARR||0);
     q.expArr += +(r.EXPANSION_ARR||0);
     q.churnArr += +(r.CHURN_ARR||0);
-    q.upForRenewal += +(r.UP_FOR_RENEWAL_ARR||0);
     q.renewed += +(r.RENEWED_ARR||0);
     q.newLogos += +(r.NEW_LOGOS||0);
     q.churnedLogos += +(r.CHURNED_LOGOS||0);
@@ -1140,6 +1139,17 @@ function preProcessArrPerformance(actualRows, planRows, logoRows) {
     q.hasActual = true;
     const m = parseDate(r.MONTH_END_DT);
     if (!latestMonth || m > latestMonth) { latestMonth = m; latestEop = +(r.EOP_ARR||0); }
+  }
+
+  // Up For Renewal actuals come from the same PROD.SALESFORCE.OPPORTUNITIES source
+  // as the FY27 Renewals tab (via preProcessRenewals), not from DEALSBASE.CUSTOMER_MONTH's
+  // UP_FOR_RENEWAL_ARR column — that column only captures the subset of renewal ARR that
+  // failed to renew (it's negative and matches the churned-logo list), not the full
+  // up-for-renewal pipeline. Using the same source here keeps this card and the FY27
+  // Renewals tab in agreement.
+  const renewalByQtr = preProcessRenewals(renewalRows || []);
+  for (const rq of renewalByQtr) {
+    if (byQtr[rq.q]) byQtr[rq.q].upForRenewal = rq.upForRenewal;
   }
 
   const emptyPlanQtr = () => ({ newArr:0, expArr:0, churnArr:0, upForRenewal:0, newLogos:0, churnedLogos:0, eopArr:null });
@@ -1386,8 +1396,8 @@ function buildArrLogoLists(pp) {
   document.getElementById('arrLogoLists').innerHTML = h || '<p>No new or churned logos recorded yet in FY27.</p>';
 }
 
-function buildArrPerformance(actualRows, planRows, logoRows) {
-  const pp = preProcessArrPerformance(actualRows, planRows, logoRows);
+function buildArrPerformance(actualRows, planRows, logoRows, renewalRows) {
+  const pp = preProcessArrPerformance(actualRows, planRows, logoRows, renewalRows);
   buildArrCards(pp);
   buildArrCharts(pp);
   buildArrLogoLists(pp);
@@ -2233,7 +2243,7 @@ async function loadAll() {
     buildRepTable(deals, closed, tgt, rvpSelfDeals, tenureMap);
     buildHealthTable(health);
     buildConsumptionTable(consumption);
-    buildArrPerformance(arrActualRows, arrPlanRows, arrLogoRows);
+    buildArrPerformance(arrActualRows, arrPlanRows, arrLogoRows, renewalRows);
     buildRenewalsTab(preProcessRenewals(renewalRows));
     buildHeadcountTab(hcDeptRows, hcEventRows, hcTermRows, hcMonthlyRows);
 
