@@ -766,10 +766,12 @@ const Q = {
       --   Sporting Life Group Limited: 3/4/26 record superseded by the 4/9/26 renewal
       --   Under Armour: 3/11/26 "Full" record superseded by the 4/30/26 "Churn" outcome
       --   GoTo Foods LLC: 4/23/26 (Q1) record superseded by an extension into Q3 (10/30/26)
+      --   CubeSmart: 5/1/26 (Q2) record was a customer opt-out, not a true renewal event
       AND OPPORTUNITY_ID NOT IN (
         '006Ql00000aXIcXIAW', -- Sporting Life Group Limited, 3/4/26 (kept: 4/9/26)
         '006Ql00000avnIcIAI', -- Under Armour, 3/11/26 Full (kept: 4/30/26 Churn)
-        '006Ql00000Bs21hIAB'  -- GoTo Foods LLC, Q1 4/23/26 (kept: Q3 10/30/26)
+        '006Ql00000Bs21hIAB', -- GoTo Foods LLC, Q1 4/23/26 (kept: Q3 10/30/26)
+        '006Ql00000BoVyLIAV'  -- CubeSmart, Q2 5/1/26, customer opt-out (Ryan confirmed)
       )
     ORDER BY FISCAL_QTR, CLOSE_DT`,
 
