@@ -1223,7 +1223,7 @@ function buildArrCards(pp) {
     { label:'Exiting ARR', value:K(pp.latestEop), sub: pp.latestMonth ? `as of ${fmtDateShort(pp.latestMonth)}` : '—' },
     { label:'New ARR (FY27 YTD)', value:K(ytdActual.newArr), sub:`vs ${K(ytdPlan.newArr)} plan YTD · ${K(fyPlan.newArr)} FY27 plan`, cls:pace(ytdActual.newArr, ytdPlan.newArr, true) },
     { label:'Expansion ARR (FY27 YTD)', value:K(ytdActual.expArr), sub:`vs ${K(ytdPlan.expArr)} plan YTD · ${K(fyPlan.expArr)} FY27 plan`, cls:pace(ytdActual.expArr, ytdPlan.expArr, true) },
-    { label:'Downsell/Churn ARR (FY27 YTD)', value:K(ytdActual.churnArr), sub:`vs ${K(ytdPlan.churnArr)} plan YTD · ${K(fyPlan.churnArr)} FY27 plan`, cls:pace(ytdActual.churnArr, ytdPlan.churnArr, false) },
+    { label:'Downsell/Churn ARR (FY27 YTD)', value:K(ytdActual.churnArr), sub:`vs ${K(ytdPlan.churnArr)} plan YTD · ${K(fyPlan.churnArr)} FY27 plan`, cls:pace(ytdActual.churnArr, ytdPlan.churnArr, true) },
     { label:'Net New ARR (FY27 YTD)', value:K(netNewActual), sub:`vs ${K(netNewPlanYtd)} plan YTD`, cls:pace(netNewActual, netNewPlanYtd, true) },
   ];
   document.getElementById('arrCardsRow').innerHTML = cards.map(c=>`
