@@ -674,36 +674,19 @@ const Q = {
     LEFT JOIN sf_vertical v ON c.CUSTOMER_ID = v.CUSTOMER_ID
     LEFT JOIN PROD.FISHBOWL.ACCOUNTS fb ON c.ACCOUNT_ID = fb.SALESFORCE_ACCOUNT_ID`,
 
-  // Rate-input for the 4-Wk Pace/Trend derivation: dollarized monthly consumption vs.
-  // raw AMPS usage for the trailing 3 complete months (excludes the current partial
-  // month). Used to derive each account's own $/usage rate in preProcessConsumption().
-  consumptionRateInputs: `
-    WITH cb AS (
-      SELECT ACCOUNT_ID, MONTH_BEGIN_DT, SUM(CONSUMPTION_AMOUNT) AS CONSUMPTION_AMOUNT
-      FROM PROD.DEALSBASE.CONSUMPTION_BUDGET
-      WHERE MONTH_BEGIN_DT >= DATEADD(month, -3, DATE_TRUNC('month', CURRENT_DATE()))
-        AND MONTH_BEGIN_DT < DATE_TRUNC('month', CURRENT_DATE())
-      GROUP BY ACCOUNT_ID, MONTH_BEGIN_DT
-    ),
-    amps AS (
-      SELECT SALESFORCE_ACCOUNT_ID AS ACCOUNT_ID, DATE_TRUNC('month', USAGE_DATE) AS MONTH_BEGIN_DT, SUM(AMPS_AMOUNT) AS AMPS_TOTAL
-      FROM PROD.FISHBOWL.AMPS
-      WHERE COALESCE(TENANT_IS_SANDBOX, FALSE) = FALSE
-        AND USAGE_DATE >= DATEADD(month, -3, DATE_TRUNC('month', CURRENT_DATE()))
-        AND USAGE_DATE < DATE_TRUNC('month', CURRENT_DATE())
-      GROUP BY 1, 2
-    )
-    SELECT cb.ACCOUNT_ID, cb.MONTH_BEGIN_DT, cb.CONSUMPTION_AMOUNT, amps.AMPS_TOTAL
-    FROM cb JOIN amps ON cb.ACCOUNT_ID = amps.ACCOUNT_ID AND cb.MONTH_BEGIN_DT = amps.MONTH_BEGIN_DT
-    WHERE amps.AMPS_TOTAL > 0`,
-
-  // Weekly raw usage for the trailing 9 completed weeks (deliberately excludes the
-  // current, still-in-progress week) — powers the 4-Wk Pace/Trend columns once
-  // converted to dollars via the rate derived from consumptionRateInputs above.
+  // Weekly dollarized usage for the trailing 9 completed weeks (deliberately excludes
+  // the current, still-in-progress week) — powers the 4-Wk Pace/Trend columns directly.
+  // Reads PROD.FISHBOWL.CONSUMPTION.CONSUMPTION_AMOUNT (filtered to the 'amps' meter)
+  // rather than deriving a $/usage rate from raw AMPS units — Ryan confirmed this table
+  // carries the real per-tenant $ figure directly, which avoids the distortion an
+  // averaged-rate approach produces for accounts whose $/unit rate swings hard month to
+  // month (e.g. Scandinavian Airlines' rate varied 28x across 3 months, which inflated
+  // its derived pace to 452% vs. the ~35-40% this table's actual dollars support).
   consumptionWeeklyUsage: `
-    SELECT SALESFORCE_ACCOUNT_ID AS ACCOUNT_ID, DATE_TRUNC('week', USAGE_DATE) AS WK, SUM(AMPS_AMOUNT) AS AMPS
-    FROM PROD.FISHBOWL.AMPS
-    WHERE COALESCE(TENANT_IS_SANDBOX, FALSE) = FALSE
+    SELECT SALESFORCE_ACCOUNT_ID AS ACCOUNT_ID, DATE_TRUNC('week', USAGE_DATE) AS WK, SUM(CONSUMPTION_AMOUNT) AS DOLLARS
+    FROM PROD.FISHBOWL.CONSUMPTION
+    WHERE CONSUMPTION_METER = 'amps'
+      AND COALESCE(TENANT_IS_SANDBOX, FALSE) = FALSE
       AND USAGE_DATE >= DATEADD(week, -9, DATE_TRUNC('week', CURRENT_DATE()))
       AND USAGE_DATE < DATE_TRUNC('week', CURRENT_DATE())
     GROUP BY 1, 2
@@ -947,30 +930,13 @@ function preProcessCustomerHealth(rows){
 }
 
 // Consumption Health: capRows = one row per (customer, account) from Q.consumptionCapacity;
-// rateRows = one row per (account, month) from Q.consumptionRateInputs; weekRows = one row
-// per (account, week) from Q.consumptionWeeklyUsage. Aggregates to customer level per the
+// weekRows = one row per (account, week) from Q.consumptionWeeklyUsage, already in dollars
+// (PROD.FISHBOWL.CONSUMPTION.CONSUMPTION_AMOUNT, 'amps' meter — no unit-to-$ rate derivation
+// needed, unlike the prior AMPS-usage-units approach). Aggregates to customer level per the
 // spec: sum capacity/burn/current4/prior4/target4 dollars across a customer's accounts
 // FIRST, then compute pct/pace/wow ratios from the summed figures (never average ratios).
-function preProcessConsumption(capRows, rateRows, weekRows) {
-  // 1) Per-account $/usage rate from trailing 3 complete months, + volatility flag.
-  const ratesByAccount = {};
-  for (const r of rateRows) {
-    const amps = +(r.AMPS_TOTAL || 0);
-    if (!amps) continue;
-    const acct = r.ACCOUNT_ID;
-    (ratesByAccount[acct] = ratesByAccount[acct] || []).push(+(r.CONSUMPTION_AMOUNT || 0) / amps);
-  }
-  const rateInfo = {};
-  for (const acct in ratesByAccount) {
-    const rates = ratesByAccount[acct];
-    const n = rates.length;
-    const avgRate = rates.reduce((s, v) => s + v, 0) / n;
-    const mx = Math.max(...rates), mn = Math.min(...rates);
-    const lowConfidence = n < 2 || mn <= 0 || (mx / mn) > 1.5;
-    rateInfo[acct] = { avgRate, lowConfidence };
-  }
-
-  // 2) Per-account weekly AMPS map for the trailing 9 completed weeks (Mon-start weeks,
+function preProcessConsumption(capRows, weekRows) {
+  // 1) Per-account weekly $ map for the trailing 9 completed weeks (Mon-start weeks,
   // matching Snowflake's DATE_TRUNC('week', ...)). Missing weeks are 0-filled at lookup
   // time below rather than skipped.
   function mondayOf(d) {
@@ -993,35 +959,34 @@ function preProcessConsumption(capRows, rateRows, weekRows) {
     const wk = parseDate(r.WK);
     if (!validWeekKeys.has(wk)) continue;
     const acct = r.ACCOUNT_ID;
-    (weeklyByAccount[acct] = weeklyByAccount[acct] || {})[wk] = +(r.AMPS || 0);
+    (weeklyByAccount[acct] = weeklyByAccount[acct] || {})[wk] = +(r.DOLLARS || 0);
     weeklyRowCount[acct] = (weeklyRowCount[acct] || 0) + 1;
   }
 
-  // 3) Per-account 4-wk current/prior/target dollars. Accounts with fewer than 8 of the
-  // 9 trailing weekly rows (insufficient history) or no derivable rate contribute nothing
-  // to the customer-level sums below (target4 included, to keep pace_pct apples-to-apples
-  // with the numerator's scope) but still flip the customer's low-confidence flag.
+  // 2) Per-account 4-wk current/prior/target dollars. Accounts with fewer than 8 of the
+  // 9 trailing weekly rows (insufficient history) contribute nothing to the customer-level
+  // sums below (target4 included, to keep pace_pct apples-to-apples with the numerator's
+  // scope).
   function acctTrend(acct, capacityArr) {
     const target4 = capacityArr > 0 ? capacityArr / 52 * 4 : 0;
-    const rInfo = rateInfo[acct];
     const hasEnoughHistory = (weeklyRowCount[acct] || 0) >= 8;
-    if (!rInfo || !hasEnoughHistory) {
-      return { current4: null, prior4: null, target4, lowConfidence: rInfo ? rInfo.lowConfidence : true, insufficient: true };
+    if (!hasEnoughHistory) {
+      return { current4: null, prior4: null, target4, insufficient: true };
     }
     const wk = weeklyByAccount[acct] || {};
-    const cur4Amps = current4Keys.reduce((s, k) => s + (wk[k] || 0), 0);
-    const pri4Amps = prior4Keys.reduce((s, k) => s + (wk[k] || 0), 0);
-    return { current4: cur4Amps * rInfo.avgRate, prior4: pri4Amps * rInfo.avgRate, target4, lowConfidence: rInfo.lowConfidence, insufficient: false };
+    const current4 = current4Keys.reduce((s, k) => s + (wk[k] || 0), 0);
+    const prior4 = prior4Keys.reduce((s, k) => s + (wk[k] || 0), 0);
+    return { current4, prior4, target4, insufficient: false };
   }
 
-  // 4) Aggregate to customer level.
+  // 3) Aggregate to customer level.
   const byCustomer = {};
   for (const r of capRows) {
     const cid = r.CUSTOMER_ID;
     const c = byCustomer[cid] || (byCustomer[cid] = {
       name: r.CUSTOMER_NAME, vertical: r.VERTICAL || '', capacityArr: 0, burned: 0,
       burnedLifeToDate: 0, tcvRecurring: 0,
-      contractStart: '', contractEnd: '', current4: 0, prior4: 0, target4: 0, anyData: false, lowConfidence: false,
+      contractStart: '', contractEnd: '', current4: 0, prior4: 0, target4: 0, anyData: false,
     });
     const capacityArr = +(r.CAPACITY_ARR || 0);
     c.capacityArr += capacityArr;
@@ -1033,7 +998,6 @@ function preProcessConsumption(capRows, rateRows, weekRows) {
     if (ce && (!c.contractEnd || ce > c.contractEnd)) c.contractEnd = ce;
 
     const t = acctTrend(r.ACCOUNT_ID, capacityArr);
-    if (t.lowConfidence) c.lowConfidence = true;
     if (!t.insufficient) {
       c.current4 += t.current4; c.prior4 += t.prior4; c.target4 += t.target4;
       c.anyData = true;
@@ -1048,7 +1012,6 @@ function preProcessConsumption(capRows, rateRows, weekRows) {
       burned: c.burned, burnedLifeToDate: c.burnedLifeToDate,
       pacePct: (c.anyData && c.target4 > 0) ? c.current4 / c.target4 : null,
       wowPct: (c.anyData && c.prior4 > 0) ? (c.current4 - c.prior4) / c.prior4 : null,
-      lowConfidence: c.lowConfidence,
       arrConsumedPct: p.arrConsumedPct, arrElapsedPct: p.arrElapsedPct, arrMultiple: p.arrMultiple,
       tcvConsumedPct: p.tcvConsumedPct, tcvElapsedPct: p.tcvElapsedPct, tcvMultiple: p.tcvMultiple,
       arrHealth: pacingHealthCategory(p.arrMultiple), tcvHealth: pacingHealthCategory(p.tcvMultiple),
@@ -2181,7 +2144,6 @@ function renderConsumptionTable(rows) {
 
   let body = '<tbody>';
   for (const r of sorted) {
-    const star = r.lowConfidence ? ` <span title="Derived usage-to-dollar rate is volatile for this account — treat as directional">*</span>` : '';
     const wowLabel = r.wowPct == null ? '—' : (r.wowPct >= 0 ? '+' : '') + PCT(r.wowPct);
     const h = healthVal(r);
     body += `<tr>
@@ -2195,7 +2157,7 @@ function renderConsumptionTable(rows) {
       <td>${multipleVal(r) != null ? PCT(multipleVal(r)) : '—'}</td>
       <td class="td-center">${h ? `<span class="pace-badge pace-cat-${h}">${PACING_CATEGORY_LABELS[h]}</span>` : '<span style="color:#9ba3af">—</span>'}</td>
       <td>${r.pacePct != null ? PCT(r.pacePct) : '—'}</td>
-      <td class="${wowClass(r.wowPct)}">${wowLabel}${star}</td>
+      <td class="${wowClass(r.wowPct)}">${wowLabel}</td>
     </tr>`;
   }
   body += '</tbody>';
@@ -2238,9 +2200,9 @@ async function loadAll() {
     msg.textContent = 'Connecting to Snowflake…';
     await waitForCowork();
     msg.textContent = 'Fetching pipeline, closed deals, quotas, customer health, and consumption…';
-    const [pipeRows, closedRows, tgtRows, healthRows, rvpSelfRows, conCapRows, conRateRows, conWeekRows, arrActualRows, arrPlanRows, arrLogoRows, renewalRows, tenureRows, hcDeptRows, hcEventRows, hcTermRows, hcMonthlyRows] = await Promise.all([
+    const [pipeRows, closedRows, tgtRows, healthRows, rvpSelfRows, conCapRows, conWeekRows, arrActualRows, arrPlanRows, arrLogoRows, renewalRows, tenureRows, hcDeptRows, hcEventRows, hcTermRows, hcMonthlyRows] = await Promise.all([
       execSQL(Q.pipeline), execSQL(Q.closedFYTD), execSQL(Q.salesTargets), execSQL(Q.customerHealth), execSQL(Q.rvpSelfOwnedDeals),
-      execSQL(Q.consumptionCapacity), execSQL(Q.consumptionRateInputs), execSQL(Q.consumptionWeeklyUsage),
+      execSQL(Q.consumptionCapacity), execSQL(Q.consumptionWeeklyUsage),
       execSQL(Q.arrActuals), execSQL(Q.arrPlan), execSQL(Q.arrLogoEvents), execSQL(Q.renewalDeals), execSQL(Q.employeeTenure),
       execSQL(Q.headcountByDept), execSQL(Q.employeeFutureEvents), execSQL(Q.terminationsTrend), execSQL(Q.headcountMonthlyTrend)
     ]);
@@ -2250,7 +2212,7 @@ async function loadAll() {
     const tgt = preProcessTargets(tgtRows);
     const health = preProcessCustomerHealth(healthRows);
     const rvpSelfDeals = preProcessRvpSelfDeals(rvpSelfRows);
-    const consumption = preProcessConsumption(conCapRows, conRateRows, conWeekRows);
+    const consumption = preProcessConsumption(conCapRows, conWeekRows);
     const tenureMap = {};
     for (const r of tenureRows) tenureMap[r.FULL_NAME] = parseDate(r.START_DT);
 
