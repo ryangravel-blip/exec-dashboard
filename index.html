@@ -723,11 +723,16 @@ const Q = {
     ORDER BY 1, 2`,
 
   // YTD ARR Performance: monthly actuals from the authoritative ARR snapshot table.
-  // DATA_TYPE='Actuals' excludes the 'In Month' (partial current month) and
-  // 'Forecast' (future months) rows so nothing gets double-counted. New/churned
-  // logo counts derive from the IS_NEW_DEAL_DT/IS_CHURN_DT flags + CUSTOMER_CNT.
-  // EOP_ARR uses C_ARR, not ARR — ARR undercounts (e.g. ~$73.6M vs. C_ARR's ~$80.0M
-  // for Feb'26); confirmed with Ryan this is the column other reporting uses.
+  // DATA_TYPE IN ('Actuals','In Month') — 'Actuals' covers fully-closed months, and
+  // 'In Month' is the current, still-in-progress month's running total (mutually
+  // exclusive with 'Actuals' per month, so no double-counting risk). Including
+  // 'In Month' means the current quarter keeps updating in real time instead of
+  // showing a blank/null bar until the whole quarter closes out — e.g. Q3 (Aug-Oct)
+  // now shows August's partial results immediately rather than waiting until Oct 31.
+  // 'Forecast' (future months) rows are still excluded. New/churned logo counts
+  // derive from the IS_NEW_DEAL_DT/IS_CHURN_DT flags + CUSTOMER_CNT. EOP_ARR uses
+  // C_ARR, not ARR — ARR undercounts (e.g. ~$73.6M vs. C_ARR's ~$80.0M for Feb'26);
+  // confirmed with Ryan this is the column other reporting uses.
   arrActuals: `
     SELECT FISCAL_QTR, FISCAL_YR, FISCAL_PERIOD, MONTH_END_DT,
       SUM(C_ARR) AS EOP_ARR,
@@ -739,7 +744,7 @@ const Q = {
       SUM(CASE WHEN IS_NEW_DEAL_DT THEN CUSTOMER_CNT ELSE 0 END) AS NEW_LOGOS,
       SUM(CASE WHEN IS_CHURN_DT THEN CUSTOMER_CNT ELSE 0 END) AS CHURNED_LOGOS
     FROM PROD.DEALSBASE.CUSTOMER_MONTH
-    WHERE DATA_TYPE = 'Actuals' AND FISCAL_YR = ${parseInt(CURRENT_FY_PREFIX)}
+    WHERE DATA_TYPE IN ('Actuals','In Month') AND FISCAL_YR = ${parseInt(CURRENT_FY_PREFIX)}
     GROUP BY 1,2,3,4
     ORDER BY MONTH_END_DT`,
 
@@ -766,12 +771,13 @@ const Q = {
 
   // Customer-level new-logo / churned-logo events for FY27 to date — powers the
   // live "New & churned logos" lists (replaces what's a hand-maintained note in
-  // the FY27 scorecard spreadsheet).
+  // the FY27 scorecard spreadsheet). Includes 'In Month' so the current month's
+  // logo events show up immediately, matching arrActuals above.
   arrLogoEvents: `
     SELECT FISCAL_QTR, FISCAL_PERIOD, MONTH_END_DT, CUSTOMER_NAME,
       IS_NEW_DEAL_DT, IS_CHURN_DT, NEW_ARR, CHURN_ARR
     FROM PROD.DEALSBASE.CUSTOMER_MONTH
-    WHERE DATA_TYPE = 'Actuals' AND FISCAL_YR = ${parseInt(CURRENT_FY_PREFIX)}
+    WHERE DATA_TYPE IN ('Actuals','In Month') AND FISCAL_YR = ${parseInt(CURRENT_FY_PREFIX)}
       AND (IS_NEW_DEAL_DT OR IS_CHURN_DT)
     ORDER BY FISCAL_QTR, MONTH_END_DT`,
 
