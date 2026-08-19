@@ -583,13 +583,15 @@ const Q = {
   // Some reps (e.g. Kevin Farley — two SFDC/CapIQ account records for the same
   // person) have exact-duplicate rows per (ROLE_TYPE, NAME, MONTH_START) in the
   // source table. QUALIFY collapses those to one row per rep/month so quota isn't
-  // double-counted. ANNUAL_QUOTA is a flat, non-prorated figure that repeats on
-  // every month row for a rep — pull it via a window MAX so the "Annual Quota"
-  // column (and anything derived from it, like Gap to Quota) reflects the true
-  // full-year quota rather than a start-date-prorated figure.
+  // double-counted. ANNUAL_QUOTA and PRORATED_QUOTA are both flat figures that
+  // repeat on every month row for a rep — pull each via a window MAX so:
+  //   - "Gap to Quota" / "FY Coverage" (this-FY columns) can use PRORATED_QUOTA_FLAT,
+  //     the fiscal-year-specific target given the rep's actual hire date this FY.
+  //   - "Annual Quota" / "Annual Coverage" (all-dates columns) use ANNUAL_QUOTA_FLAT,
+  //     the full non-prorated quota (what they'll carry once at full tenure).
   salesTargets: `
     WITH deduped AS (
-      SELECT ROLE_TYPE, NAME, MANAGER_NAME, MONTH_START, ANNUAL_QUOTA, MONTHLY_QUOTA_FROM_PRORATED
+      SELECT ROLE_TYPE, NAME, MANAGER_NAME, MONTH_START, ANNUAL_QUOTA, PRORATED_QUOTA, MONTHLY_QUOTA_FROM_PRORATED
       FROM load.finance_sandbox.mrp_sales_targets
       WHERE MONTH_START IN ('2026-02-01','2026-03-01','2026-04-01','2026-05-01','2026-06-01','2026-07-01','2026-08-01','2026-09-01','2026-10-01','2026-11-01','2026-12-01','2027-01-01')
         AND ROLE_TYPE IN ('AE','RVP')
@@ -597,7 +599,8 @@ const Q = {
       QUALIFY ROW_NUMBER() OVER (PARTITION BY ROLE_TYPE, NAME, MONTH_START ORDER BY MANAGER_NAME) = 1
     )
     SELECT ROLE_TYPE, NAME, MANAGER_NAME, MONTH_START, MONTHLY_QUOTA_FROM_PRORATED AS TARGET,
-           MAX(ANNUAL_QUOTA) OVER (PARTITION BY ROLE_TYPE, NAME) AS ANNUAL_QUOTA_FLAT
+           MAX(ANNUAL_QUOTA) OVER (PARTITION BY ROLE_TYPE, NAME) AS ANNUAL_QUOTA_FLAT,
+           MAX(PRORATED_QUOTA) OVER (PARTITION BY ROLE_TYPE, NAME) AS PRORATED_QUOTA_FLAT
     FROM deduped`,
 
   // Customer Health: same base as the monthly dashboard's Customer ARR tab
@@ -943,20 +946,24 @@ function preProcessRvpSelfDeals(rows){
 }
 
 function preProcessTargets(rows){
-  const ae = {}, aeManager = {}, aeAnnual = {}, aeYtd = {}, aeQtr = {};
-  const rvpAnnual = {}, rvpYtd = {}, rvpQtr = {};
+  const ae = {}, aeManager = {}, aeAnnual = {}, aeProrated = {}, aeYtd = {}, aeQtr = {};
+  const rvpAnnual = {}, rvpProrated = {}, rvpYtd = {}, rvpQtr = {};
   const YTD_MONTHS = new Set(FYTD_MONTH_STARTS);
   for (const r of rows) {
     const name = alias(r.NAME||''), val = +(r.TARGET||0), mgr = alias(r.MANAGER_NAME||'');
     const annualFlat = +(r.ANNUAL_QUOTA_FLAT||0);
+    const proratedFlat = +(r.PRORATED_QUOTA_FLAT||0);
     const m = parseDate(r.MONTH_START);
     if (r.ROLE_TYPE === 'AE') {
       if (EXCLUDED_REPS.has(name)) continue;
       if (mgr && !aeManager[name]) aeManager[name] = mgr;
-      // Annual Quota column (and anything derived from it, like Gap to Quota) uses
-      // the flat ANNUAL_QUOTA figure, not a sum of prorated monthly amounts — it's
-      // the same value on every month row for a rep, so assign rather than accumulate.
+      // "Annual Quota"/"Annual Coverage" (Total pipeline — all dates) use the flat
+      // full-year ANNUAL_QUOTA. "Gap to Quota"/"FY Coverage" (Open pipeline — this FY)
+      // use the flat PRORATED_QUOTA — the fiscal-year-specific target that accounts
+      // for the rep's actual hire date this FY. Both are the same value on every
+      // month row for a rep, so assign rather than accumulate.
       aeAnnual[name] = annualFlat;
+      aeProrated[name] = proratedFlat;
       if (YTD_MONTHS.has(m)) aeYtd[name] = (aeYtd[name]||0) + val;
       for (const q of QUARTERS) {
         if (q.months.includes(m)) { if(!aeQtr[q.fq]) aeQtr[q.fq]={}; aeQtr[q.fq][name]=(aeQtr[q.fq][name]||0)+val; }
@@ -966,13 +973,14 @@ function preProcessTargets(rows){
       // their AEs' quotas (the two can differ), so keep it in a separate map keyed
       // by the RVP's own name and use it directly for that manager's row.
       rvpAnnual[name] = annualFlat;
+      rvpProrated[name] = proratedFlat;
       if (YTD_MONTHS.has(m)) rvpYtd[name] = (rvpYtd[name]||0) + val;
       for (const q of QUARTERS) {
         if (q.months.includes(m)) { if(!rvpQtr[q.fq]) rvpQtr[q.fq]={}; rvpQtr[q.fq][name]=(rvpQtr[q.fq][name]||0)+val; }
       }
     }
   }
-  return { aeManager, aeAnnual, aeYtd, aeQtr, aeNames: Object.keys(aeAnnual), rvpAnnual, rvpYtd, rvpQtr };
+  return { aeManager, aeAnnual, aeProrated, aeYtd, aeQtr, aeNames: Object.keys(aeAnnual), rvpAnnual, rvpProrated, rvpYtd, rvpQtr };
 }
 
 function preProcessCustomerHealth(rows){
@@ -1841,8 +1849,11 @@ function buildCards(deals, closed, tgt){
   const openPipeFY = fyDeals.reduce((s,d)=>s+d.arr,0);
   const allTimePipe = deals.reduce((s,d)=>s+d.arr,0);
   const closedFYTD = Object.values(closed).reduce((s,r)=>s+r.total,0);
-  const annualQuota = Object.values(tgt.aeAnnual).reduce((s,v)=>s+v,0);
-  const remaining = annualQuota - closedFYTD;
+  // FY-scoped cards below use the prorated (hire-date-adjusted) quota, matching
+  // "Gap to Quota"/"FY Coverage" in the table — the full annual quota is reserved
+  // for the "Total pipeline — all dates" columns.
+  const proratedQuota = Object.values(tgt.aeProrated).reduce((s,v)=>s+v,0);
+  const remaining = proratedQuota - closedFYTD;
   const coverage = remaining>0 ? openPipeFY/remaining : null;
   const late = deals.filter(d=>LATE_STAGES.has(d.stage));
   const lateVal = late.reduce((s,d)=>s+d.arr,0);
@@ -1852,7 +1863,7 @@ function buildCards(deals, closed, tgt){
   for (const d of fyDeals) { byRepFY[d.owner] = (byRepFY[d.owner]||0) + d.arr; }
   let below3x = 0, repsWithQuota = 0;
   for (const name of tgt.aeNames) {
-    const rem = tgt.aeAnnual[name] - (closed[name]?.total||0);
+    const rem = tgt.aeProrated[name] - (closed[name]?.total||0);
     if (rem <= 0) continue;
     repsWithQuota++;
     const cov = (byRepFY[name]||0) / rem;
@@ -1932,10 +1943,14 @@ function buildRepTable(deals, closed, tgt, rvpSelfDeals, tenureMap){
             s3=d.stages['Stage 3 - Validation']||0,
             s4=(d.stages['Stage 4 – Proposal & Plan']||0)+(d.stages['Stage 4 – Selection']||0),
             s5=d.stages['Stage 5 – Negotiation']||0;
-      const openFY=d.fyTotal, allTime=d.total, cl=closed[rep]?.total||0, annual=tgt.aeAnnual[rep]||0, ytdq=tgt.aeYtd[rep]||0;
-      const remaining = annual - cl;
-      const covFY = remaining>0 ? openFY/remaining : null;
-      const covAnnual = remaining>0 ? allTime/remaining : null;
+      const openFY=d.fyTotal, allTime=d.total, cl=closed[rep]?.total||0, annual=tgt.aeAnnual[rep]||0, prorated=tgt.aeProrated[rep]||0, ytdq=tgt.aeYtd[rep]||0;
+      // Gap to Quota / FY Coverage are this-FY metrics, so they're measured against
+      // the prorated (hire-date-adjusted) target, not the full annual quota — next
+      // FY, once at full tenure, prorated and annual converge and this washes out.
+      const remainingFY = prorated - cl;
+      const remainingAnnual = annual - cl;
+      const covFY = remainingFY>0 ? openFY/remainingFY : null;
+      const covAnnual = remainingAnnual>0 ? allTime/remainingAnnual : null;
       const pctToQuota = ytdq>0 ? cl/ytdq : null;
       mS[0]+=s1;mS[1]+=s2;mS[2]+=s3;mS[3]+=s4;mS[4]+=s5;
       mOpenFY+=openFY; mAllTime+=allTime; mClosed+=cl;
@@ -1943,7 +1958,7 @@ function buildRepTable(deals, closed, tgt, rvpSelfDeals, tenureMap){
         <td class="lbl-indent">${rep}${tenureHtml(tenureYears(tenureMap, rep))}</td>
         <td>${K(cl)}</td><td>${ytdq?K(ytdq):'—'}</td><td>${pctToQuota!=null?PCT(pctToQuota):'—'}</td>
         <td>${s1?K(s1):'—'}</td><td>${s2?K(s2):'—'}</td><td>${s3?K(s3):'—'}</td><td>${s4?K(s4):'—'}</td><td>${s5?K(s5):'—'}</td>
-        <td>${K(openFY)}</td><td>${annual?K(remaining):'—'}</td><td class="${covClass(covFY)}">${covFY!=null?covFY.toFixed(1)+'x':'—'}</td>
+        <td>${K(openFY)}</td><td>${prorated?K(remainingFY):'—'}</td><td class="${covClass(covFY)}">${covFY!=null?covFY.toFixed(1)+'x':'—'}</td>
         <td>${K(allTime)}</td><td>${annual?K(annual):'—'}</td>
         <td class="${covClass(covAnnual)}">${covAnnual!=null?covAnnual.toFixed(1)+'x':'—'}</td>
       </tr>`;
@@ -1953,33 +1968,37 @@ function buildRepTable(deals, closed, tgt, rvpSelfDeals, tenureMap){
     // RVP quota row to look up.
     const mAnnual = tgt.rvpAnnual[mgr] != null ? tgt.rvpAnnual[mgr]
       : reps.reduce((s,rep)=>s+(tgt.aeAnnual[rep]||0),0);
+    const mProrated = tgt.rvpProrated[mgr] != null ? tgt.rvpProrated[mgr]
+      : reps.reduce((s,rep)=>s+(tgt.aeProrated[rep]||0),0);
     const mYtdQ = tgt.rvpYtd[mgr] != null ? tgt.rvpYtd[mgr]
       : reps.reduce((s,rep)=>s+(tgt.aeYtd[rep]||0),0);
-    const mRemaining = mAnnual - mClosed;
-    const mCovFY = mRemaining>0 ? mOpenFY/mRemaining : null;
-    const mCovAnnual = mRemaining>0 ? mAllTime/mRemaining : null;
+    const mRemainingFY = mProrated - mClosed;
+    const mRemainingAnnual = mAnnual - mClosed;
+    const mCovFY = mRemainingFY>0 ? mOpenFY/mRemainingFY : null;
+    const mCovAnnual = mRemainingAnnual>0 ? mAllTime/mRemainingAnnual : null;
     const mPctToQuota = mYtdQ>0 ? mClosed/mYtdQ : null;
     h += `<tr class="mgr-row">
       <td class="lbl-sub">${mgr}${mgr !== 'Unassigned' ? tenureHtml(tenureYears(tenureMap, mgr)) : ''}</td>
       <td>${K(mClosed)}</td><td>${mYtdQ?K(mYtdQ):'—'}</td><td>${mPctToQuota!=null?PCT(mPctToQuota):'—'}</td>
       <td>${mS[0]?K(mS[0]):'—'}</td><td>${mS[1]?K(mS[1]):'—'}</td><td>${mS[2]?K(mS[2]):'—'}</td><td>${mS[3]?K(mS[3]):'—'}</td><td>${mS[4]?K(mS[4]):'—'}</td>
-      <td>${K(mOpenFY)}</td><td>${mAnnual?K(mRemaining):'—'}</td><td class="${covClass(mCovFY)}">${mCovFY!=null?mCovFY.toFixed(1)+'x':'—'}</td>
+      <td>${K(mOpenFY)}</td><td>${mProrated?K(mRemainingFY):'—'}</td><td class="${covClass(mCovFY)}">${mCovFY!=null?mCovFY.toFixed(1)+'x':'—'}</td>
       <td>${K(mAllTime)}</td><td>${mAnnual?K(mAnnual):'—'}</td>
       <td class="${covClass(mCovAnnual)}">${mCovAnnual!=null?mCovAnnual.toFixed(1)+'x':'—'}</td>
     </tr>`;
     h += repRows;
     gT.s[0]+=mS[0];gT.s[1]+=mS[1];gT.s[2]+=mS[2];gT.s[3]+=mS[3];gT.s[4]+=mS[4];
-    gT.openFY+=mOpenFY; gT.allTime+=mAllTime; gT.closed+=mClosed; gT.annual+=mAnnual; gT.ytdq+=mYtdQ;
+    gT.openFY+=mOpenFY; gT.allTime+=mAllTime; gT.closed+=mClosed; gT.annual+=mAnnual; gT.prorated=(gT.prorated||0)+mProrated; gT.ytdq+=mYtdQ;
   }
-  const gRemaining = gT.annual - gT.closed;
-  const gCovFY = gRemaining>0 ? gT.openFY/gRemaining : null;
-  const gCovAnnual = gRemaining>0 ? gT.allTime/gRemaining : null;
+  const gRemainingFY = gT.prorated - gT.closed;
+  const gRemainingAnnual = gT.annual - gT.closed;
+  const gCovFY = gRemainingFY>0 ? gT.openFY/gRemainingFY : null;
+  const gCovAnnual = gRemainingAnnual>0 ? gT.allTime/gRemainingAnnual : null;
   const gPctToQuota = gT.ytdq>0 ? gT.closed/gT.ytdq : null;
   h += `<tr class="total-row">
     <td class="lbl-sub">Total</td>
     <td>${K(gT.closed)}</td><td>${K(gT.ytdq)}</td><td>${gPctToQuota!=null?PCT(gPctToQuota):'—'}</td>
     <td>${K(gT.s[0])}</td><td>${K(gT.s[1])}</td><td>${K(gT.s[2])}</td><td>${K(gT.s[3])}</td><td>${K(gT.s[4])}</td>
-    <td>${K(gT.openFY)}</td><td>${K(gRemaining)}</td><td class="${covClass(gCovFY)}">${gCovFY!=null?gCovFY.toFixed(1)+'x':'—'}</td>
+    <td>${K(gT.openFY)}</td><td>${K(gRemainingFY)}</td><td class="${covClass(gCovFY)}">${gCovFY!=null?gCovFY.toFixed(1)+'x':'—'}</td>
     <td>${K(gT.allTime)}</td><td>${K(gT.annual)}</td>
     <td class="${covClass(gCovAnnual)}">${gCovAnnual!=null?gCovAnnual.toFixed(1)+'x':'—'}</td>
   </tr>`;
