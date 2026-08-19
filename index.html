@@ -431,6 +431,11 @@ const NAME_ALIAS = {
   'Robert Pope': 'Rob Pope',
   'Jeff Dome': 'Jeffrey Dome',
   'David Newman': 'Dave Newman',
+  // Kevin Farley has two separate SFDC/CapIQ account records ("Kevin Farley" and
+  // "Kevin Farley (East Legacy)") for the same person — merge his pipeline/closed
+  // deals under one name. His quota-table duplicate rows are deduped separately
+  // in the salesTargets query (don't sum his quota twice).
+  'Kevin Farley (East Legacy)': 'Kevin Farley',
 };
 
 // Reps to drop from every view (e.g. no longer with the company / placeholder rows).
@@ -575,13 +580,25 @@ const Q = {
       AND CLOSED_ARR <> 0
     ORDER BY CLOSE_MONTH`,
 
+  // Some reps (e.g. Kevin Farley — two SFDC/CapIQ account records for the same
+  // person) have exact-duplicate rows per (ROLE_TYPE, NAME, MONTH_START) in the
+  // source table. QUALIFY collapses those to one row per rep/month so quota isn't
+  // double-counted. ANNUAL_QUOTA is a flat, non-prorated figure that repeats on
+  // every month row for a rep — pull it via a window MAX so the "Annual Quota"
+  // column (and anything derived from it, like Gap to Quota) reflects the true
+  // full-year quota rather than a start-date-prorated figure.
   salesTargets: `
-    SELECT ROLE_TYPE, NAME, MANAGER_NAME, MONTH_START, SUM(MONTHLY_QUOTA_FROM_PRORATED) as TARGET
-    FROM load.finance_sandbox.mrp_sales_targets
-    WHERE MONTH_START IN ('2026-02-01','2026-03-01','2026-04-01','2026-05-01','2026-06-01','2026-07-01','2026-08-01','2026-09-01','2026-10-01','2026-11-01','2026-12-01','2027-01-01')
-      AND ROLE_TYPE IN ('AE','RVP')
-      AND (IS_ACTIVE = TRUE OR IS_ACTIVE IS NULL)
-    GROUP BY ROLE_TYPE, NAME, MANAGER_NAME, MONTH_START`,
+    WITH deduped AS (
+      SELECT ROLE_TYPE, NAME, MANAGER_NAME, MONTH_START, ANNUAL_QUOTA, MONTHLY_QUOTA_FROM_PRORATED
+      FROM load.finance_sandbox.mrp_sales_targets
+      WHERE MONTH_START IN ('2026-02-01','2026-03-01','2026-04-01','2026-05-01','2026-06-01','2026-07-01','2026-08-01','2026-09-01','2026-10-01','2026-11-01','2026-12-01','2027-01-01')
+        AND ROLE_TYPE IN ('AE','RVP')
+        AND (IS_ACTIVE = TRUE OR IS_ACTIVE IS NULL)
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY ROLE_TYPE, NAME, MONTH_START ORDER BY MANAGER_NAME) = 1
+    )
+    SELECT ROLE_TYPE, NAME, MANAGER_NAME, MONTH_START, MONTHLY_QUOTA_FROM_PRORATED AS TARGET,
+           MAX(ANNUAL_QUOTA) OVER (PARTITION BY ROLE_TYPE, NAME) AS ANNUAL_QUOTA_FLAT
+    FROM deduped`,
 
   // Customer Health: same base as the monthly dashboard's Customer ARR tab
   // (PROD.DEALSBASE.CUSTOMER_ACCOUNT_MAP joined to PROD.SALESFORCE.ACCOUNTS), plus
@@ -931,11 +948,15 @@ function preProcessTargets(rows){
   const YTD_MONTHS = new Set(FYTD_MONTH_STARTS);
   for (const r of rows) {
     const name = alias(r.NAME||''), val = +(r.TARGET||0), mgr = alias(r.MANAGER_NAME||'');
+    const annualFlat = +(r.ANNUAL_QUOTA_FLAT||0);
     const m = parseDate(r.MONTH_START);
     if (r.ROLE_TYPE === 'AE') {
       if (EXCLUDED_REPS.has(name)) continue;
       if (mgr && !aeManager[name]) aeManager[name] = mgr;
-      aeAnnual[name] = (aeAnnual[name]||0) + val;
+      // Annual Quota column (and anything derived from it, like Gap to Quota) uses
+      // the flat ANNUAL_QUOTA figure, not a sum of prorated monthly amounts — it's
+      // the same value on every month row for a rep, so assign rather than accumulate.
+      aeAnnual[name] = annualFlat;
       if (YTD_MONTHS.has(m)) aeYtd[name] = (aeYtd[name]||0) + val;
       for (const q of QUARTERS) {
         if (q.months.includes(m)) { if(!aeQtr[q.fq]) aeQtr[q.fq]={}; aeQtr[q.fq][name]=(aeQtr[q.fq][name]||0)+val; }
@@ -944,7 +965,7 @@ function preProcessTargets(rows){
       // RVPs carry their own quota in mrp_sales_targets — this is NOT a rollup of
       // their AEs' quotas (the two can differ), so keep it in a separate map keyed
       // by the RVP's own name and use it directly for that manager's row.
-      rvpAnnual[name] = (rvpAnnual[name]||0) + val;
+      rvpAnnual[name] = annualFlat;
       if (YTD_MONTHS.has(m)) rvpYtd[name] = (rvpYtd[name]||0) + val;
       for (const q of QUARTERS) {
         if (q.months.includes(m)) { if(!rvpQtr[q.fq]) rvpQtr[q.fq]={}; rvpQtr[q.fq][name]=(rvpQtr[q.fq][name]||0)+val; }
